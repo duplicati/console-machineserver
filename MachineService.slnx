@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="Interprocess.NamedPipes/Interprocess.NamedPipes.csproj" />
+  <Project Path="MachineService.Common/MachineService.Common.csproj" />
+  <Project Path="MachineService.Control/MachineService.Control.csproj" />
+  <Project Path="MachineService.External/MachineService.External.csproj" />
+  <Project Path="MachineService.Server/MachineService.Server.csproj" />
+  <Project Path="MachineService.State/MachineService.State.csproj" />
+  <Project Path="WebSockets.Common/WebSockets.Common.csproj" />
+</Solution>

@@ -1,0 +1,22 @@
+.DS_Store
+CHECKLIST.md
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+local.environmentvariables.json
+debug-privatekey.pem
+Internal/Generated/*

@@ -1,0 +1,18 @@
+[
+  {
+    "cidr": "1.1.1.1/32",
+    "description": "Example blocked IP range"
+  },
+  {
+    "cidr": "2001:4860:4860::8888/128",
+    "description": "Example blocked IPv6 range"
+  },
+  {
+    "cidr": "1.1.1.1",
+    "description": "Example blocked single IP"
+  },
+  {
+    "cidr": "1.1.1.1/32",
+    "_comment": "Example blocked IP range without description"
+  }
+]
