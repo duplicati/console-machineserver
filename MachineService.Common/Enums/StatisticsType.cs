@@ -81,4 +81,16 @@ public enum StatisticsType
     /// </summary>
     ControlRelayDestinationNotAuthenticated = 113,
 
+    /// <summary>
+    /// Client authentication timeout failure
+    /// </summary>
+    AuthClientTimeoutFailure = 114,
+    /// <summary>
+    /// Portal authentication timeout failure
+    /// </summary>
+    AuthPortalTimeoutFailure = 115,
+    /// <summary>
+    /// Client authentication failed due to client not found
+    /// </summary>
+    AuthClientNotFound = 116,
 }

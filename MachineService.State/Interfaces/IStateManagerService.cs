@@ -42,6 +42,14 @@ public interface IStateManagerService
     Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string machineServer, string? clientIp);
 
     /// <summary>
+    /// Updates the activity timestamp for a client
+    /// </summary>
+    /// <param name="clientId">The client ID</param>
+    /// <param name="organizationId">The organization ID</param>
+    /// <returns><c>true</c> if the client activity was updated; otherwise,
+    Task<bool> UpdateClientActivity(string clientId, string organizationId);
+
+    /// <summary>
     /// Deregisters a client with the state manager
     /// </summary>
     /// <param name="connectionId">The connection ID</param>

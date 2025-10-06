@@ -53,12 +53,9 @@ public class PingBehavior(
 
         // If authenticated and connected, refresh the client registration
         if (state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated })
-        {
-            await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId ?? "", state.OrganizationId!,
-                    state.RegisteredAgentId, state.ClientVersion, ServerUrlBuilder.BuildUrl(), state.RemoteIpAddress);
-        }
+            await stateManagerService.UpdateClientActivity(state.ClientId ?? "", state.OrganizationId ?? "");
 
-        if (state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated })
+        if (!settings.DisablePingMessages && state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated })
             await publishAgentActivityService.Publish(new AgentActivityMessage(ActivityType.Ping,
                 state.ConnectedOn, state.RegisteredAgentId ?? throw new InvalidOperationException("RegisteredAgentId is not available, and should be"), state.OrganizationId, state.ClientVersion, null), CancellationToken.None);
 

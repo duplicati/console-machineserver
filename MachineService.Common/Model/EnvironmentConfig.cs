@@ -36,6 +36,10 @@ namespace MachineService.Common.Model;
 /// <param name="SecondsBetweenStatistics">Seconds between gathering statistics</param>
 /// <param name="StatusReportIntervalSeconds">Interval in seconds between status reports to the backend</param>
 /// <param name="RedirectUrl">The URL to redirect to, if requesting the root path</param>
+/// <param name="DisableDatabaseClientHistory">Whether to disable client history tracking</param>
+/// <param name="InMemoryClientList">Whether to use an in-memory client list instead of a database</param>
+/// <param name="DisablePingMessages">Whether to disable ping activity messages sent on MassTransit</param>
+/// <param name="DisableDatabaseStatistics">Whether to disable database statistics gathering</param>
 public record EnvironmentConfig(
     string? MachineName,
     bool IsProd,
@@ -48,7 +52,11 @@ public record EnvironmentConfig(
     int MaxBytesBeforeAuthentication = 100000,
     int WebsocketReceiveBufferSize = 4096,
     int SecondsBetweenStatistics = 300,
-    int StatusReportIntervalSeconds = 30
+    int StatusReportIntervalSeconds = 30,
+    bool DisableDatabaseClientHistory = false,
+    bool InMemoryClientList = false,
+    bool DisablePingMessages = false,
+    bool DisableDatabaseStatistics = false
 )
 {
     /// <summary>
@@ -57,4 +65,9 @@ public record EnvironmentConfig(
     public string GitVersion => !string.IsNullOrWhiteSpace(Git_Commit_Version)
         ? Git_Commit_Version
         : (Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly())?.GetName().Version?.ToString() ?? "unknown";
+
+    /// <summary>
+    /// Flag indicating whether a database is required
+    /// </summary>
+    public bool RequiresDatabase => !InMemoryClientList || !DisableDatabaseStatistics;
 }

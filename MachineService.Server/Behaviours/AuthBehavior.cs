@@ -146,7 +146,12 @@ public class AuthBehavior(
                 ))
             };
 
-            statisticsGatherer.Increment(StatisticsType.AuthClientFailure);
+            if (authResult.Exception is TimeoutException || authResult.Exception is OperationCanceledException || authResult.Exception is MassTransit.RequestTimeoutException)
+                statisticsGatherer.Increment(state.Type == ConnectionType.Agent ? StatisticsType.AuthClientTimeoutFailure : StatisticsType.AuthPortalTimeoutFailure);
+            else if (authResult.Exception?.Message.Contains("Agent not found") == true)
+                statisticsGatherer.Increment(StatisticsType.AuthClientNotFound);
+            else
+                statisticsGatherer.Increment(StatisticsType.AuthClientFailure);
         }
 
         await state.WriteMessage(response, derivedConfig);

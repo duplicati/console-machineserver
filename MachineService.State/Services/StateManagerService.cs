@@ -29,7 +29,8 @@ namespace MachineService.State.Services;
 /// State manager service implementation using MartenDB as the backing store
 /// </summary>
 /// <param name="session">The MartenDB document session</param>
-public class StateManagerService(IDocumentStore store) : IStateManagerService
+/// <param name="environmentConfig">The environment configuration</param>
+public class StateManagerService(IDocumentStore store, EnvironmentConfig environmentConfig) : IStateManagerService
 {
     /// <summary>
     /// The action taken when registering or unregistering a client
@@ -135,22 +136,42 @@ public class StateManagerService(IDocumentStore store) : IStateManagerService
             ClientIp: clientIp,
             ClientType: clientType
         ));
-        session.Store(new ClientRegisterHistory(
-            RegisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
-            ClientId: clientId,
-            Action: RegisterAction.Register,
-            OrganizationId: organizationId,
-            MachineServerUri: machineServerUri,
-            RegisteredOn: DateTimeOffset.UtcNow,
-            MachineRegistrationId: registeredAgentId,
-            ClientVersion: clientVersion,
-            ConnectionId: connectionId.ToString(),
-            ClientIp: clientIp,
-            ClientType: clientType));
+
+        if (!environmentConfig.DisableDatabaseClientHistory)
+        {
+            session.Store(new ClientRegisterHistory(
+                RegisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
+                ClientId: clientId,
+                Action: RegisterAction.Register,
+                OrganizationId: organizationId,
+                MachineServerUri: machineServerUri,
+                RegisteredOn: DateTimeOffset.UtcNow,
+                MachineRegistrationId: registeredAgentId,
+                ClientVersion: clientVersion,
+                ConnectionId: connectionId.ToString(),
+                ClientIp: clientIp,
+                ClientType: clientType));
+        }
 
         await session.SaveChangesAsync();
         return true;
     }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateClientActivity(string clientId, string organizationId)
+    {
+        using var session = store.LightweightSession();
+        var current = session.Query<ActiveConnection>()
+            .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+
+        if (current == null)
+            return false;
+
+        session.Store(current with { LastUpdateOn = DateTimeOffset.UtcNow });
+        await session.SaveChangesAsync();
+        return true;
+    }
+
 
     /// <inheritdoc />
     public async Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent)
@@ -159,13 +180,16 @@ public class StateManagerService(IDocumentStore store) : IStateManagerService
         if (!string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(organizationId))
             session.DeleteWhere<ActiveConnection>(x => x.ClientId == clientId && x.OrganizationId == organizationId);
 
-        session.Store(new ClientUnregisterHistory(
-            UnregisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
-            ClientId: clientId,
-            UnregisterOn: DateTimeOffset.UtcNow,
-            BytesReceived: bytesReceived,
-            BytesSent: bytesSent,
-            ConnectionId: connectionId.ToString()));
+        if (!environmentConfig.DisableDatabaseClientHistory)
+        {
+            session.Store(new ClientUnregisterHistory(
+                UnregisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
+                ClientId: clientId,
+                UnregisterOn: DateTimeOffset.UtcNow,
+                BytesReceived: bytesReceived,
+                BytesSent: bytesSent,
+                ConnectionId: connectionId.ToString()));
+        }
 
         await session.SaveChangesAsync();
         return true;
@@ -187,7 +211,7 @@ public class StateManagerService(IDocumentStore store) : IStateManagerService
             MachineRegistrationId = x.MachineRegistrationId,
             ClientVersion = x.ClientVersion,
             LastUpdatedOn = x.LastUpdateOn,
-            Type = x.ClientType,
+            Type = x.ClientType
         }).ToList();
     }
 

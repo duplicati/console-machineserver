@@ -19,9 +19,8 @@
 // SOFTWARE.
 using MachineService.Common.Enums;
 using MachineService.Common.Services;
-using NUnit.Framework;
 
-namespace MachineService.Server.UnitTests;
+namespace MachineService.Common.UnitTests;
 
 public class StatisticsGathererTests
 {

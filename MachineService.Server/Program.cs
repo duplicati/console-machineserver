@@ -139,24 +139,32 @@ if (blacklistConfig is not null && blacklistConfig.IsValid())
         .AddSingleton(blacklistConfig)
         .AddSingleton<IPRestrictionLoaderService>();
 
-if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(connectionString))
+if (!envConfig.RequiresDatabase || (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(connectionString)))
 {
     builder.Services
         .AddSingleton<IStateManagerService, InMemoryStateManagerService>()
-        .AddTransient<IStatisticsPersistenceService, InMemoryStatisticsPersistenceService>()
-        .AddHostedService<GatherStatisticsPersistence>();
+        .AddTransient<IStatisticsPersistenceService, InMemoryStatisticsPersistenceService>();
 }
 else
 {
     if (string.IsNullOrWhiteSpace(connectionString))
         throw new Exception("Database connection string is not set in configuration");
 
-    builder.Services
-        .AddTransient<IStateManagerService, StateManagerService>()
-        .AddTransient<IStatisticsPersistenceService, StatisticsPersistenceService>()
-        .AddHostedService<GatherStatisticsPersistence>()
-        .RegisterMartenDB(connectionString, envConfig.VerifySchema ?? true, envConfig.PreCompiledDbClasses ?? false);
+    if (envConfig.DisableDatabaseStatistics)
+        builder.Services.AddTransient<IStatisticsPersistenceService, InMemoryStatisticsPersistenceService>();
+    else
+        builder.Services.AddTransient<IStatisticsPersistenceService, StatisticsPersistenceService>();
+
+    if (envConfig.InMemoryClientList)
+        builder.Services.AddSingleton<IStateManagerService, InMemoryStateManagerService>();
+    else
+        builder.Services.AddTransient<IStateManagerService, StateManagerService>();
+
+    builder.Services.RegisterMartenDB(connectionString, envConfig.VerifySchema ?? true, envConfig.PreCompiledDbClasses ?? false);
 }
+
+builder.Services.AddHostedService<GatherStatisticsPersistence>();
+
 
 // Set up logging
 var envLogLevel = builder.Configuration.GetValue<string>("Serilog:MinimumLevel:Default");
