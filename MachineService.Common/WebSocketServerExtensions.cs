@@ -99,7 +99,7 @@ public static class WebSocketServerExtensions
                                 };
 
                                 socketState.ConnectedOn = DateTimeOffset.Now;
-                                socketState.RemoteIpAddress = context.Connection.RemoteIpAddress?.ToString();
+                                socketState.RemoteIpAddress = IpUtils.GetClientIp(context);
 
                                 connections.Add(socketState);
 

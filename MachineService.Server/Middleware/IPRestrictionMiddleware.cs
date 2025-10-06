@@ -34,7 +34,8 @@ public class IPRestrictionMiddleware(RequestDelegate next, ILogger<IPRestriction
     /// <returns>A task representing the completion of request processing.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Connection.RemoteIpAddress is { } address)
+        var clientIpString = IpUtils.GetClientIp(context);
+        if (!string.IsNullOrEmpty(clientIpString) && System.Net.IPAddress.TryParse(clientIpString, out var address))
         {
             var rules = loaderService.GetRules();
             if (rules.Any(rule => rule.IsMatch(address)))
