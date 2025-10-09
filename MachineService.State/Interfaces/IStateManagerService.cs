@@ -37,9 +37,10 @@ public interface IStateManagerService
     /// <param name="registeredAgentId">The registered agent ID</param>
     /// <param name="clientVersion">The client version</param>
     /// <param name="machineServer">The machine server URI</param>
+    /// <param name="gatewayId">The gateway ID</param>
     /// <param name="clientIp">The client IP address</param>
     /// <returns><c>true</c> if the client was registered; otherwise, <c>false</c>.</returns>
-    Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string machineServer, string? clientIp);
+    Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp);
 
     /// <summary>
     /// Updates the activity timestamp for a client
@@ -61,9 +62,22 @@ public interface IStateManagerService
     Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent);
 
     /// <summary>
-    /// Gets the list of active clients for the specified organization
+    /// Gets the list of active agents for the specified organization
     /// </summary>
     /// <param name="organizationId">The organization ID</param>
-    /// <returns>A list of active clients</returns>
-    public Task<List<ClientRegistration>> GetClients(string organizationId);
+    /// <returns>A list of active agents</returns>
+    public Task<List<ClientRegistration>> GetAgents(string organizationId);
+
+    /// <summary>
+    /// Gets the list of active portals for the specified organization
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <returns>A list of active portals</returns>
+    public Task<List<ClientRegistration>> GetPortals(string organizationId);
+
+    /// <summary>
+    /// Cleans up stale data from the state manager
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    public Task PurgeStaleData();
 }

@@ -41,6 +41,10 @@ public enum MessageTypes
     /// </summary>
     AuthPortal,
     /// <summary>
+    /// A message requesting authentication from the gateway
+    /// </summary>
+    AuthGateway,
+    /// <summary>
     /// An initial welcome message from the server
     /// </summary>
     Welcome,
@@ -59,5 +63,9 @@ public enum MessageTypes
     /// <summary>
     /// A list message from the console to get a list of connected clients
     /// </summary>
-    List
+    List,
+    /// <summary>
+    /// A gateway proxy message
+    /// </summary>
+    Proxy
 }

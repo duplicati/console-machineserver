@@ -19,6 +19,8 @@
 // SOFTWARE.
 using MachineService.Common.Services;
 using MachineService.External;
+using MachineService.Server.Utility;
+using MachineService.State.Interfaces;
 
 namespace MachineService.Server.Events;
 
@@ -27,8 +29,17 @@ namespace MachineService.Server.Events;
 /// </summary>
 /// <param name="envConfig">DI Injected settings</param>
 /// <param name="listBehavior">DI Injected behavior to process the virtual list commands</param>
+/// <param name="stateManagerService">DI injected to manage the state of connected clients</param>
 /// <param name="connectionListService">DI injected to access all connections to machineserver</param>
-public class AfterAuthenticatedClientBehavior(EnvironmentConfig envConfig, ListBehavior listBehavior, ConnectionListService connectionListService, IPublishAgentActivityService publishAgentActivityService) : IAfterAuthenticatedClientBehavior
+/// <param name="gatewayConnectionList">DI injected to access all gateway connections to machineserver</param>
+/// <param name="publishAgentActivityService">DI injected to publish agent activity events</param
+public class AfterAuthenticatedClientBehavior(
+    EnvironmentConfig envConfig,
+    ListBehavior listBehavior,
+    IStateManagerService stateManagerService,
+    ConnectionListService connectionListService,
+    GatewayConnectionList gatewayConnectionList,
+    IPublishAgentActivityService publishAgentActivityService) : IAfterAuthenticatedClientBehavior
 {
     /// <inheritdoc />
     public async Task ExecuteAsync(SocketState state, Dictionary<string, string?>? metadata)
@@ -38,35 +49,14 @@ public class AfterAuthenticatedClientBehavior(EnvironmentConfig envConfig, ListB
             Log.Debug("Executing AfterAuthenticatedClientBehavior for {ClientId}", state.ClientId);
 
             if (state is { ConnectionState: ConnectionState.ConnectedAgentAuthenticated })
+            {
                 await publishAgentActivityService.Publish(new AgentActivityMessage(ActivityType.Connected,
                     state.ConnectedOn, state.RegisteredAgentId ?? throw new InvalidOperationException("RegisteredAgentId is not available"), state.OrganizationId, state.ClientVersion, metadata), CancellationToken.None);
 
-            // Proactively send the list of connected clients to all existing and authenticated
-            // portal connections
-            var listSnapshot = connectionListService.GetConnections();
-
-            foreach (var portalConnection in listSnapshot.Where(x =>
-                         x.OrganizationId == state.OrganizationId &&
-                         x.ConnectionState == ConnectionState.ConnectedPortalAuthenticated))
-            {
-                Log.Debug("Propagating list to portal {PortalClientId} reactively after an agent authenticated belonging to organization", portalConnection.ClientId);
-
-                // Send the list of connected clients to the authenticated portal, we do that
-                // by emulating a list command, so we have use the built-in ListBehavior
-
-                try
+                if (!string.IsNullOrWhiteSpace(state.OrganizationId))
                 {
-                    await listBehavior.ExecuteAsync(portalConnection, new EnvelopedMessage
-                    {
-                        From = envConfig.MachineName,
-                        To = portalConnection.ClientId,
-                        Type = MessageTypes.List.ToString().ToLowerInvariant(),
-                        MessageId = Guid.NewGuid().ToString()
-                    });
-                }
-                catch (Exception e)
-                {
-                    Log.Debug("Failed sending List to Portal connection, non critical: {e}", e);
+                    await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId);
+                    await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId);
                 }
             }
         }

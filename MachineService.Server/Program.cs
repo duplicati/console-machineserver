@@ -19,20 +19,21 @@
 // SOFTWARE.
 using System.Security.Cryptography;
 using System.Text;
-using CommonLoggingConfig;
 using Interprocess.NamedPipes;
 using MachineService.Common;
+using MachineService.Common.Middleware;
 using MachineService.Common.Services;
 using MachineService.Server.Events;
-using MachineService.Server.Middleware;
 using MachineService.Server.Model;
 using MachineService.Server.Services;
 using MachineService.Server.Utility;
 using MachineService.State.Interfaces;
+using MachineService.State;
 using Microsoft.OpenApi.Models;
 using Serilog.Core;
 using Serilog.Events;
-using SimpleSecurityFilter;
+using MachineService.GatewayClient.Services;
+using ConsoleCommon;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,6 +85,14 @@ var envConfig = builder.Configuration.GetRequiredSection("Environment").Get<Envi
 if (envConfig.VerifySchema == null)
     envConfig = envConfig with { VerifySchema = !initializedSchema };
 
+// If the machine name is not set, we set it to the environment machine name
+if (string.IsNullOrWhiteSpace(envConfig.MachineName))
+    envConfig = envConfig with { MachineName = Environment.MachineName };
+
+// If the instanceId is not set, we set it to the machine name plus a GUID
+if (string.IsNullOrWhiteSpace(envConfig.InstanceId))
+    envConfig = envConfig with { InstanceId = $"{(envConfig.GatewayMode ? "gateway" : "service")}-{envConfig.MachineName}-{Guid.NewGuid()}" };
+
 if (string.IsNullOrWhiteSpace(envConfig.MachineServerPrivate) || envConfig.MachineServerKeyExpires == default)
 {
     if (!builder.Environment.IsDevelopment())
@@ -125,13 +134,13 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton(envConfig)
     .AddSingleton(DerivedConfig.Create(Base64PemReader.Read(envConfig.MachineServerPrivate), envConfig.MachineServerKeyExpires!.Value))
-    .RegisterMassTransit(builder)
     .AddScoped<IBackendRelayConnection, BackendRelayConnection>()
-    .AddScoped<IPublishPublicKeyMessage, PublishPublicKeyService>()
-    .AddHostedService<PublicKeyBroadcaster>()
+    .RegisterMassTransit(builder, envConfig)
     .AddSingleton<ConnectionListService>()
+    .AddSingleton<GatewayConnectionList>()
     .AddSingleton<IStatisticsGatherer, StatisticsGatherer>()
-    .AddSingleton<IPendingAgentControlService, PendingAgentControlService>();
+    .AddSingleton<IPendingAgentControlService, PendingAgentControlService>()
+    .AddSingleton(new ServerStatistics());
 
 var blacklistConfig = builder.Configuration.GetSection("IPBlacklist").Get<IPBlacklistConfig>();
 if (blacklistConfig is not null && blacklistConfig.IsValid())
@@ -188,86 +197,116 @@ builder.AddCommonLogging(serilogConfig, extra, config =>
         "[{Timestamp:HH:mm:ss} {Level:u3}] [{HttpRequestId}] ({ClientIp}) {RequestMethod} {RequestPath} | UA: {UserAgent} | {Message:lj}{NewLine}{Properties:j}{NewLine}{Exception}");
 });
 
-builder.Services.AddHostedService(sp =>
+if (envConfig.EnableTraceDebugging)
 {
-    return new NamedPipeServerService(sp.GetRequiredService<ILogger<NamedPipeServerService>>(), "machineservice"
-        , (message, writer, cancellationToken) =>
-        {
-            try
+    builder.Services.AddHostedService(sp =>
+    {
+        return new NamedPipeServerService(sp.GetRequiredService<ILogger<NamedPipeServerService>>(), "machineservice"
+            , (message, writer, cancellationToken) =>
             {
-                switch (message.Type)
-                {
-                    case "trace":
-                        if (message.Data == "reset")
-                        {
-                            Log.Information("Trace request to change by external process to client {Trace}", message.Data);
-
-                            logLevelSwitch.MinimumLevel = defaultLogLevel;
-                            traceTarget = null;
-                            writer.SendResponse(new IPCMessage { Type = "response", Data = $"Trace reset to default {logLevelSwitch.MinimumLevel}" });
-                        }
-                        else if (!string.IsNullOrWhiteSpace(message.Data))
-                        {
-                            // We force to debug level when trace is enabled.
-                            logLevelSwitch.MinimumLevel = LogEventLevel.Debug;
-
-                            // And set the trace target
-                            traceTarget = message.Data;
-
-                            Log.Information($"Trace request to change by external process to client/keyword {message.Data}");
-                            writer.SendResponse(new IPCMessage { Type = "response", Data = $"Trace enabled." });
-                        }
-                        break;
-                    case "loglevel":
-                        Log.Information("Loglevel request to change by external process to {LogLevel}", message.Data);
-                        logLevelSwitch.MinimumLevel = message.Data switch
-                        {
-                            "debug" => LogEventLevel.Debug,
-                            "information" => LogEventLevel.Information,
-                            "warning" => LogEventLevel.Warning,
-                            "error" => LogEventLevel.Error,
-                            "fatal" => LogEventLevel.Fatal,
-                            "reset" => defaultLogLevel,
-                            _ => throw new Exception("Invalid log level")
-                        };
-                        writer.SendResponse(new IPCMessage { Type = "response", Data = $"Log level set to {logLevelSwitch.MinimumLevel}" });
-                        break;
-                    default:
-                        throw new Exception($"Unknown message type {message.Type}");
-                }
-
-            }
-            catch (Exception e)
-            {
-                Log.Warning($"Error processing message: {e.Message}");
                 try
                 {
-                    writer.SendResponse(new IPCMessage { Type = "response", Data = e.Message });
-                }
-                catch
-                {
-                    // Can be ignored at this point.
-                }
-            }
-        });
-});
+                    switch (message.Type)
+                    {
+                        case "trace":
+                            if (message.Data == "reset")
+                            {
+                                Log.Information("Trace request to change by external process to client {Trace}", message.Data);
 
-var behaviorCommandMap = new Dictionary<string, Type>
+                                logLevelSwitch.MinimumLevel = defaultLogLevel;
+                                traceTarget = null;
+                                writer.SendResponse(new IPCMessage { Type = "response", Data = $"Trace reset to default {logLevelSwitch.MinimumLevel}" });
+                            }
+                            else if (!string.IsNullOrWhiteSpace(message.Data))
+                            {
+                                // We force to debug level when trace is enabled.
+                                logLevelSwitch.MinimumLevel = LogEventLevel.Debug;
+
+                                // And set the trace target
+                                traceTarget = message.Data;
+
+                                Log.Information($"Trace request to change by external process to client/keyword {message.Data}");
+                                writer.SendResponse(new IPCMessage { Type = "response", Data = $"Trace enabled." });
+                            }
+                            break;
+                        case "loglevel":
+                            Log.Information("Loglevel request to change by external process to {LogLevel}", message.Data);
+                            logLevelSwitch.MinimumLevel = message.Data switch
+                            {
+                                "debug" => LogEventLevel.Debug,
+                                "information" => LogEventLevel.Information,
+                                "warning" => LogEventLevel.Warning,
+                                "error" => LogEventLevel.Error,
+                                "fatal" => LogEventLevel.Fatal,
+                                "reset" => defaultLogLevel,
+                                _ => throw new Exception("Invalid log level")
+                            };
+                            writer.SendResponse(new IPCMessage { Type = "response", Data = $"Log level set to {logLevelSwitch.MinimumLevel}" });
+                            break;
+                        default:
+                            throw new Exception($"Unknown message type {message.Type}");
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    Log.Warning($"Error processing message: {e.Message}");
+                    try
+                    {
+                        writer.SendResponse(new IPCMessage { Type = "response", Data = e.Message });
+                    }
+                    catch
+                    {
+                        // Can be ignored at this point.
+                    }
+                }
+            });
+    });
+}
+
+if (envConfig.IsUsingGatewayFeatures)
 {
-    {PingBehavior.Command, typeof(PingBehavior)},
-    {AuthPortalBehavior.Command, typeof(AuthPortalBehavior)},
-    {AuthBehavior.Command, typeof(AuthBehavior)},
-    {CommandBehavior.Command, typeof(CommandBehavior)},
-    {ControlBehavior.Command, typeof(ControlBehavior)},
-    {ListBehavior.Command, typeof(ListBehavior)}
-};
+    if (string.IsNullOrWhiteSpace(envConfig.GatewayPreSharedKey))
+        throw new Exception("GatewayPreSharedKey must be set when running in gateway mode");
+
+    if (!builder.Environment.IsDevelopment())
+    {
+        if (string.IsNullOrWhiteSpace(envConfig.LicenseKey))
+            throw new Exception("LicenseKey must be set when using gateway features");
+
+        var license = await LicenseChecker.ObtainLicenseAsync(envConfig.LicenseKey, CancellationToken.None);
+        license.EnsureFeatures(ConsoleLicenseFeatures.GatewayMachineServer);
+        if (license.IsInGracePeriod)
+            Log.Warning("The provided license is expired and in the grace period. It will stop working on {Expiration}", license.ValidToWithGrace);
+    }
+}
+
+Dictionary<string, Type> behaviorCommandMap;
+if (envConfig.GatewayMode)
+{
+    behaviorCommandMap = MachineService.GatewayServer.Behaviours.GatewayBehaviorMap.Behaviors;
+
+    builder.Services
+        .AddTransient<IAfterDisconnectBehavior, GatewayAfterDisconnectBehavior>();
+}
+else
+{
+    if (!string.IsNullOrWhiteSpace(envConfig.GatewayServers))
+        builder.Services.AddHostedService<GatewayConnectionKeeper>();
+
+    behaviorCommandMap = MachineService.Server.ServerBehaviorMap.Behaviors;
+
+    builder.Services
+        .AddScoped<IPublishPublicKeyMessage, PublishPublicKeyService>()
+        .AddHostedService<PublicKeyBroadcaster>()
+        .AddTransient<IAfterDisconnectBehavior, AfterDisconnectBehavior>()
+        .AddTransient<IAfterAuthenticatedClientBehavior, AfterAuthenticatedClientBehavior>()
+        .AddTransient<IPublishAgentActivityService, PublishAgentActivityService>();
+}
 
 foreach (var behavior in behaviorCommandMap)
     builder.Services.AddTransient(behavior.Value);
 
-builder.Services.AddTransient<IPublishAgentActivityService, PublishAgentActivityService>();
-builder.Services.AddTransient<IAfterDisconnectBehavior, AfterDisconnectBehavior>();
-builder.Services.AddTransient<IAfterAuthenticatedClientBehavior, AfterAuthenticatedClientBehavior>();
 
 if (!envConfig.IsProd)
     builder.Services.AddSwaggerGen(c =>
@@ -302,11 +341,10 @@ app.UseHttpsRedirection()
 if (blacklistConfig is not null && blacklistConfig.IsValid())
     await app.UseIpRestrictionAndLoad();
 
-var serverStatistics = new ServerStatistics();
-
 var statusReport = new Timer(_ =>
 {
     var connectionList = app.Services.GetRequiredService<ConnectionListService>().GetConnections();
+    var serverStatistics = app.Services.GetRequiredService<ServerStatistics>();
     var socketStates = connectionList.ToList();
 
     // We collect here instead of "on connection" because this is a non-critical statistic
@@ -318,6 +356,7 @@ var statusReport = new Timer(_ =>
 
     Log.Information(@"[Mandatory]
            Is Production: {isProd}
+             Instance Id: {InstanceId}
             Server build: {GitCommit}
                   Uptime: {Uptime}
              Thread Pool: {BusyWorkerThreads} (Workers) & {BusyCompletionPortThreads} (Completion) of Max: {MaxWorkerThreads} & {MaxCompletionPortThreads}
@@ -328,6 +367,7 @@ Record Connected clients: {MaxConnections}
                Log Level: {LogLevel}
                  Tracing: {TraceTarget}",
         envConfig.IsProd,
+        envConfig.InstanceId,
         envConfig.GitVersion,
         serverStatistics.UptimeVerbose,
         maxWorkerThreads - workerThreads,
@@ -351,7 +391,7 @@ Record Connected clients: {MaxConnections}
     }
 }, null, TimeSpan.Zero, TimeSpan.FromSeconds(envConfig.StatusReportIntervalSeconds));
 
-app.ConfigureWebSocketServer(behaviorCommandMap, serverStatistics);
+app.ConfigureWebSocketServer(behaviorCommandMap);
 
 try
 {

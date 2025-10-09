@@ -17,9 +17,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-using System.Net.WebSockets;
-using System.Text;
-using MachineService.Common.Exceptions;
 using MachineService.Common.Interfaces;
 using MachineService.Common.Services;
 using MachineService.Common.Util;
@@ -29,7 +26,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using WebSockets.Common;
-using WebSockets.Common.Exception;
 
 namespace MachineService.Common;
 
@@ -44,14 +40,14 @@ public static class WebSocketServerExtensions
     /// </summary>
     /// <param name="app">The webapplication object to hook onto</param>
     /// <param name="messageHandlers">Array of message handlers, that contains actions to be performed by messagetype</param>
-    /// <param name="serverStatistics">Statistics gatherer reference</param>
-    public static void ConfigureWebSocketServer(this WebApplication app, Dictionary<string, Type> messageHandlers, ServerStatistics serverStatistics)
+    public static void ConfigureWebSocketServer(this WebApplication app, Dictionary<string, Type> messageHandlers)
     {
         app.Use(async (context, next) =>
         {
-            var settings = context.RequestServices.GetService<EnvironmentConfig>();
-            var derivedConfig = context.RequestServices.GetService<DerivedConfig>();
-            var connections = context.RequestServices.GetService<ConnectionListService>();
+            var settings = context.RequestServices.GetRequiredService<EnvironmentConfig>();
+            var derivedConfig = context.RequestServices.GetRequiredService<DerivedConfig>();
+            var connections = context.RequestServices.GetRequiredService<ConnectionListService>();
+            var serverStatistics = context.RequestServices.GetRequiredService<ServerStatistics>();
             var onAfterDisconnect = context.RequestServices.GetService<IAfterDisconnectBehavior>();
 
             if (settings == null || derivedConfig == null || connections == null)
@@ -79,6 +75,7 @@ public static class WebSocketServerExtensions
                             break;
                         case "/agent":
                         case "/portal":
+                        case "/gateway":
                             if (context.WebSockets.IsWebSocketRequest)
                             {
                                 using var socketState = new SocketState()
@@ -95,6 +92,7 @@ public static class WebSocketServerExtensions
                                 {
                                     "/portal" => ConnectionState.ConnectedPortalUnauthenticated,
                                     "/agent" => ConnectionState.ConnectedAgentUnauthenticated,
+                                    "/gateway" => ConnectionState.ConnectedGatewayUnauthenticated,
                                     _ => ConnectionState.ConnectedUnknown
                                 };
 
@@ -102,180 +100,39 @@ public static class WebSocketServerExtensions
                                 socketState.RemoteIpAddress = IpUtils.GetClientIp(context);
 
                                 connections.Add(socketState);
-
                                 serverStatistics.IncrementConnectionCount();
 
-                                var welcomeMessage = new EnvelopedMessage
+                                try
                                 {
-                                    From = settings.MachineName,
-                                    To = "unknown client",
-                                    MessageId = Guid.NewGuid().ToString(),
-                                    Type = MessageTypes.Welcome.ToString().ToLowerInvariant(),
-                                    Payload = EnvelopedMessage.SerializePayload(new WelcomeMessage(
-                                        PublicKeyHash: derivedConfig.PublicKeyHash,
-                                        MachineName: settings.MachineName ?? "",
-                                        ServerVersion: settings.GitVersion,
-                                        derivedConfig.AllowedProtocolVersions
-                                    ))
-                                };
-
-                                await socketState.WebSocket.WriteMessage(welcomeMessage, WrappingType.PlainText);
-
-                                await socketState.ReceiveMessages(async (result, buffer) =>
+                                    var welcomeMessage = new EnvelopedMessage
                                     {
-                                        serverStatistics.IncrementMessagesReceivedCount();
+                                        From = settings.InstanceId,
+                                        To = "unknown client",
+                                        MessageId = Guid.NewGuid().ToString(),
+                                        Type = MessageTypes.Welcome.ToString().ToLowerInvariant(),
+                                        Payload = EnvelopedMessage.SerializePayload(new WelcomeMessage(
+                                            PublicKeyHash: derivedConfig.PublicKeyHash,
+                                            MachineName: settings.MachineName ?? "",
+                                            ServerVersion: settings.GitVersion,
+                                            Nonce: socketState.ConnectionState == ConnectionState.ConnectedGatewayUnauthenticated
+                                             ? Convert.ToBase64String(socketState.NonceBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+                                             : null,
+                                            derivedConfig.AllowedProtocolVersions
+                                        ))
+                                    };
 
-                                        if (result.MessageType == WebSocketMessageType.Text)
-                                        {
-
-                                            try
-                                            {
-                                                var derivedConfig = context.RequestServices.GetRequiredService<DerivedConfig>();
-
-                                                if (socketState.Authenticated == false &&
-                                                    socketState.BytesReceived > settings.MaxBytesBeforeAuthentication)
-                                                {
-                                                    var message = ErrorMessages.TooMuchDataWithoutAuthentication;
-                                                    Log.Warning(message);
-
-                                                    throw new PolicyViolationException(message);
-                                                }
-
-                                                if (socketState.Authenticated &&
-                                                    socketState.TokenExpiration < DateTimeOffset.Now)
-                                                {
-                                                    var message = $"Token expired on {socketState.TokenExpiration}";
-                                                    Log.Warning(message);
-                                                    var warningMessage = new EnvelopedMessage()
-                                                    {
-                                                        From = settings.MachineName,
-                                                        To = socketState.ClientId,
-                                                        MessageId = Guid.NewGuid().ToString(),
-                                                        Type = MessageTypes.Warning.ToString().ToLowerInvariant(),
-                                                        ErrorMessage = ErrorMessages.TokenExpired
-                                                    };
-
-                                                    await socketState.WriteMessage(warningMessage, derivedConfig);
-
-                                                    throw new PolicyViolationException(message);
-                                                }
-
-                                                // We have a message, lets unwrap and process.
-
-                                                Log.Debug(
-                                                    $"Message Received on Wire from {socketState.ClientId} {Encoding.UTF8.GetString(buffer)}");
-                                                // If messages arrive encrypted, we will need the privatekey to decrypt it.
-                                                EnvelopedMessage? requestMessage = null;
-
-                                                Log.Debug(
-                                                    $"{socketState.ClientId}\tState is: {socketState.ConnectionState}\tInferred wrapping: {socketState.InferWrapping()}");
-
-                                                try
-                                                {
-                                                    requestMessage = EnvelopedMessage.FromBytes(buffer,
-                                                        Base64PemReader.Read(settings.MachineServerPrivate!), socketState.InferWrapping());
-                                                }
-                                                catch (JwtOrJweDecryptionException dex)
-                                                {
-                                                    Log.Warning(dex,
-                                                        $"{ErrorMessages.InvalidConnectionStateForAuthentication}. State was: {socketState.ConnectionState} and inferred wrapping was {socketState.InferWrapping()}");
-
-                                                    throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForAuthentication);
-                                                }
-                                                catch (EnvelopeJsonParsingException e)
-                                                {
-                                                    Log.Warning(e,
-                                                        $"{ErrorMessages.MalformedEnvelope} {Encoding.UTF8.GetString(buffer)}");
-
-                                                    throw new PolicyViolationException(ErrorMessages.MalformedEnvelope);
-                                                }
-
-                                                Log.Debug(
-                                                    $"Message {requestMessage?.Type} received from: {requestMessage?.From} {requestMessage?.Serialize()}");
-
-                                                if (requestMessage is not null && requestMessage.Type is not null)
-                                                {
-                                                    if (messageHandlers.TryGetValue(requestMessage.Type, out var handlerType))
-                                                    {
-                                                        try
-                                                        {
-                                                            // using var reqContext = context.RequestServices.CreateAsyncScope();
-                                                            var req = (IMessageBehavior)ActivatorUtilities
-                                                                .GetServiceOrCreateInstance(context.RequestServices,
-                                                                    handlerType);
-                                                            await req.ExecuteAsync(socketState, requestMessage);
-                                                        }
-                                                        catch (PolicyViolationException)
-                                                        {
-                                                            // In this case we rethrow, as it will be appropriatelly treated in the flow,
-                                                            // specifically in the catch block of the ReceiveMessages method.
-                                                            throw;
-                                                        }
-                                                        catch (Exception e)
-                                                        {
-                                                            Log.Warning(e, $"Failed to process message {requestMessage.Type}");
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        Log.Error($"No handler found for message type {requestMessage.Type}");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    Log.Warning($"Message received was null or had no type, buffer to analyze {Encoding.UTF8.GetString(buffer)}");
-                                                }
-                                            }
-                                            catch (PolicyViolationException pev)
-                                            {
-                                                Log.Warning(pev, $"Policy Violation, closing websocket ClientID: {socketState.ClientId} Bytes Received: {socketState.BytesReceived} Bytes Sent: {socketState.BytesSent}");
-                                                await socketState.WebSocket.TerminateWithPolicyViolation(pev.Message);
-                                                connections.Remove(socketState);
-
-                                                await socketState.WebSocket.TerminateWithPolicyViolation(
-                                                    pev.Message);
-
-                                                try
-                                                {
-                                                    if (onAfterDisconnect is not null)
-                                                        await onAfterDisconnect.ExecuteAsync(socketState);
-                                                }
-                                                catch (Exception e)
-                                                {
-                                                    Log.Warning(e, "Error while calling the AfterDisconnect delegate");
-                                                }
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                Log.Error(e, "An error occurred while processing the message");
-                                            }
-                                        }
-                                        else if (result.MessageType == WebSocketMessageType.Binary)
-                                        {
-                                            // We are not supporting it now.
-                                            Log.Warning("Received a binary format message on websocket, ignoring it");
-                                        }
-                                        else if (result.MessageType == WebSocketMessageType.Close ||
-                                                 socketState.WebSocket.State == WebSocketState.Aborted)
-                                        {
-                                            connections.Remove(socketState);
-                                            await socketState.WebSocket.TerminateGracefully();
-                                            try
-                                            {
-                                                if (onAfterDisconnect is not null)
-                                                    await onAfterDisconnect.ExecuteAsync(socketState);
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                Log.Warning(e, "Error while calling the AfterDisconnect delegate");
-                                            }
-                                        }
-                                    },
-                                    settings.WebsocketReceiveBufferSize
-                                );
-
-                                // We are done with the connection, remove it from the list.
-                                connections.Remove(socketState);
+                                    await socketState.WriteMessage(welcomeMessage, WrappingType.PlainText);
+                                    var messageLoop = ActivatorUtilities.CreateInstance<WebSocketMessageLoop>(
+                                        context.RequestServices,
+                                        socketState,
+                                        messageHandlers.ToMessageHandlerFactory(context.RequestServices));
+                                    await messageLoop.RunMessageLoop(context.RequestAborted);
+                                }
+                                finally
+                                {
+                                    // We are done with the connection, remove it from the list.
+                                    connections.Remove(socketState);
+                                }
 
                                 try
                                 {
@@ -320,4 +177,15 @@ public static class WebSocketServerExtensions
             }
         });
     }
+
+    /// <summary>
+    /// Converts a dictionary of message handler types into a factory function that can create instances of IMessageBehavior.
+    /// </summary>
+    /// <param name="messageHandlers">Dictionary mapping message types to their handler types</param>
+    /// <param name="provider">The service provider for dependency injection</param>
+    /// <returns>A factory function that takes a message type and returns an instance of IMessageBehavior or null if not found</returns>
+    public static Func<string, IMessageBehavior?> ToMessageHandlerFactory(this Dictionary<string, Type> messageHandlers, IServiceProvider provider)
+        => (type) => messageHandlers.ContainsKey(type)
+            ? (IMessageBehavior)ActivatorUtilities.GetServiceOrCreateInstance(provider, messageHandlers[type])!
+            : null;
 }

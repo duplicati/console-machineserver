@@ -21,7 +21,6 @@
 using MachineService.Common.Enums;
 using MachineService.Common.Services;
 using MachineService.External;
-using MachineService.Server.Utility;
 using MachineService.State.Interfaces;
 
 namespace MachineService.Server.Behaviours;
@@ -67,7 +66,7 @@ public class PingBehavior(
             await state.WriteMessage(new EnvelopedMessage
             {
                 Type = MessageTypes.Pong.ToString().ToLowerInvariant(),
-                From = settings?.MachineName,
+                From = settings.InstanceId,
                 MessageId = Guid.NewGuid().ToString(),
                 To = message.From
             }, derived);

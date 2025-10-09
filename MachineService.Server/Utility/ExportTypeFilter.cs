@@ -36,7 +36,8 @@ internal class ExportTypeFilter : IDocumentFilter
             typeof(AuthMessage),
             typeof(AuthResultMessage),
             typeof(MessageTypes),
-            typeof(WelcomeMessage)
+            typeof(WelcomeMessage),
+            typeof(ProxyMessage)
         };
 
         foreach (var model in typesToExport)

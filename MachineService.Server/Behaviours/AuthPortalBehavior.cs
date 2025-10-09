@@ -21,7 +21,6 @@ using MachineService.Common;
 using MachineService.Common.Enums;
 using MachineService.Common.Exceptions;
 using MachineService.Common.Services;
-using MachineService.Server.Utility;
 using MachineService.State.Interfaces;
 
 namespace MachineService.Server.Behaviours;
@@ -76,25 +75,22 @@ public class AuthPortalBehavior(
 
         var authResult = await backendRelayConnection.ValidateOAuthToken(authRequest.Token);
 
-        state.Authenticated = authResult.Success;
-
         if (authResult.Success)
         {
             state.OrganizationId = authResult.OrganizationId;
             state.TokenExpiration = authResult.TokenExpiration;
-            state.Type = ConnectionType.Portal;
             state.ClientId = message.From!;
             state.ClientVersion = authRequest.ClientVersion;
             state.ConnectionState = ConnectionState.ConnectedPortalAuthenticated;
             await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId, state.OrganizationId!,
-                state.RegisteredAgentId, state.ClientVersion, ServerUrlBuilder.BuildUrl(), state.RemoteIpAddress);
+                state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress);
         }
 
 
         var response = new EnvelopedMessage
         {
             Type = MessageTypes.AuthPortal.ToString().ToLowerInvariant(),
-            From = envConfig.MachineName,
+            From = envConfig.InstanceId,
             MessageId = Guid.NewGuid().ToString(),
             To = message.From,
             Payload = EnvelopedMessage.SerializePayload(new AuthResultMessage(

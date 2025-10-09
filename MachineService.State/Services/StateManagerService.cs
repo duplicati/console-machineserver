@@ -33,6 +33,11 @@ namespace MachineService.State.Services;
 public class StateManagerService(IDocumentStore store, EnvironmentConfig environmentConfig) : IStateManagerService
 {
     /// <summary>
+    /// The retention period for active connections
+    /// </summary>
+    private static readonly TimeSpan ConnectionRetentionPeriod = TimeSpan.FromDays(1);
+
+    /// <summary>
     /// The action taken when registering or unregistering a client
     /// </summary>
     public enum RegisterAction
@@ -51,7 +56,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// The record for storing active connections
     /// </summary>
     /// <param name="ClientId">The client ID</param>
-    /// <param name="MachineServerUri">The machine server URI</param>
+    /// <param name="GatewayId">The gateway ID</param>
     /// <param name="OrganizationId">The organization ID</param>
     /// <param name="FirstSeenOn">The first seen timestamp</param>
     /// <param name="LastUpdateOn">The last update timestamp</param>
@@ -61,8 +66,8 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// <param name="ClientType">The client type</param>
     public sealed record ActiveConnection(
         string Id,
+        string? GatewayId,
         string ClientId,
-        string MachineServerUri,
         string OrganizationId,
         DateTimeOffset FirstSeenOn,
         DateTimeOffset LastUpdateOn,
@@ -77,6 +82,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// </summary>
     /// <param name="RegisterId">The registration ID</param>
     /// <param name="ClientId">The client ID</param>
+    /// <param name="GatewayId">The gateway ID</param>
     /// <param name="Action">The action taken (register/unregister)</param>
     /// <param name="OrganizationId">The organization ID</param>
     /// <param name="MachineServerUri">The machine server URI</param>
@@ -89,9 +95,9 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     public sealed record ClientRegisterHistory(
         string RegisterId,
         string ClientId,
+        string? GatewayId,
         RegisterAction Action,
         string OrganizationId,
-        string MachineServerUri,
         DateTimeOffset RegisteredOn,
         string? MachineRegistrationId,
         string? ClientVersion,
@@ -116,9 +122,14 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
         long BytesSent,
         string ConnectionId);
 
+    /// <summary>
+    /// The timeout after which a client is considered inactive and removed from the list.
+    /// </summary>
+    private static readonly TimeSpan ClientTimeout = TimeSpan.FromMinutes(5);
+
     /// <inheritdoc />
     public async Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId,
-        string? registeredAgentId, string? clientVersion, string machineServerUri, string? clientIp)
+        string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp)
     {
         using var session = store.LightweightSession();
         var current = session.Query<ActiveConnection>()
@@ -127,7 +138,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
         session.Store(new ActiveConnection(
             Id: current?.Id ?? Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
             ClientId: clientId,
-            MachineServerUri: machineServerUri,
+            GatewayId: gatewayId,
             OrganizationId: organizationId,
             FirstSeenOn: current?.FirstSeenOn ?? DateTimeOffset.UtcNow,
             LastUpdateOn: DateTimeOffset.UtcNow,
@@ -142,9 +153,9 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             session.Store(new ClientRegisterHistory(
                 RegisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
                 ClientId: clientId,
+                GatewayId: gatewayId,
                 Action: RegisterAction.Register,
                 OrganizationId: organizationId,
-                MachineServerUri: machineServerUri,
                 RegisteredOn: DateTimeOffset.UtcNow,
                 MachineRegistrationId: registeredAgentId,
                 ClientVersion: clientVersion,
@@ -195,24 +206,57 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
         return true;
     }
 
-    /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetClients(string organizationId)
+    /// <summary>
+    /// Gets the list of active connections for the specified organization and client type
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="clientType">The client type</param>
+    /// <returns>A list of active connections</returns>
+    private async Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType)
     {
+        var expirationTime = DateTimeOffset.UtcNow - ClientTimeout;
         using var session = store.LightweightSession();
         var registrations = await session.Query<ActiveConnection>()
-            .Where(x => x.OrganizationId == organizationId && !x.ClientId.StartsWith("portal-client", StringComparison.OrdinalIgnoreCase))
+            .Where(x => x.OrganizationId == organizationId)
+            .Where(x => x.LastUpdateOn >= expirationTime)
+            .Where(x => x.ClientType == clientType)
             .ToListAsync();
 
         return registrations.Select(x => new ClientRegistration()
         {
+            GatewayId = x.GatewayId ?? "",
             ClientId = x.ClientId,
-            MachineServerUri = x.MachineServerUri,
             OrganizationId = x.OrganizationId,
             MachineRegistrationId = x.MachineRegistrationId,
             ClientVersion = x.ClientVersion,
             LastUpdatedOn = x.LastUpdateOn,
             Type = x.ClientType
         }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ClientRegistration>> GetAgents(string organizationId)
+        => await GetConnections(organizationId, ConnectionType.Agent);
+
+    /// <inheritdoc />
+    public async Task<List<ClientRegistration>> GetPortals(string organizationId)
+        => await GetConnections(organizationId, ConnectionType.Portal);
+
+    /// <inheritdoc />
+    public Task PurgeStaleData()
+    {
+        using var session = store.LightweightSession();
+
+        var expirationTimeConnections = DateTimeOffset.UtcNow - ConnectionRetentionPeriod;
+        session.DeleteWhere<ActiveConnection>(x => x.LastUpdateOn < expirationTimeConnections);
+
+        if (!environmentConfig.DisableDatabaseClientHistory)
+        {
+            var expirationTimeActivityLog = DateTimeOffset.UtcNow - TimeSpan.FromDays(environmentConfig.StatisticsRetentionDays); ;
+            session.DeleteWhere<ClientRegisterHistory>(x => x.RegisteredOn < expirationTimeActivityLog);
+            session.DeleteWhere<ClientUnregisterHistory>(x => x.UnregisterOn < expirationTimeActivityLog);
+        }
+        return session.SaveChangesAsync();
     }
 
     /// <summary>

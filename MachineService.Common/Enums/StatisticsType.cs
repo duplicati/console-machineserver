@@ -93,4 +93,16 @@ public enum StatisticsType
     /// Client authentication failed due to client not found
     /// </summary>
     AuthClientNotFound = 116,
+    /// <summary>
+    /// Gateway authentication succeeded
+    /// </summary>
+    AuthGatewaySuccess = 117,
+    /// <summary>
+    /// Gateway authentication failed
+    /// </summary>
+    AuthGatewayFailure = 118,
+    /// <summary>
+    /// Invalid proxy command
+    /// </summary>
+    InvalidProxyCommand = 119,
 }

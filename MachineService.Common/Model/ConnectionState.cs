@@ -43,5 +43,13 @@ public enum ConnectionState : int
     /// <summary>
     /// Connected as a portal, and authenticated
     /// </summary>
-    ConnectedPortalAuthenticated = 2222
+    ConnectedPortalAuthenticated = 2222,
+    /// <summary>
+    /// Connected as a gateway, but not yet authenticated
+    /// </summary>
+    ConnectedGatewayUnauthenticated = 3000,
+    /// <summary>
+    /// Connected as a gateway, and authenticated
+    /// </summary>
+    ConnectedGatewayAuthenticated = 3333,
 }

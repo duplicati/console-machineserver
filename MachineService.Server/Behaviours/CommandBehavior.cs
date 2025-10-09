@@ -21,6 +21,7 @@
 using MachineService.Common;
 using MachineService.Common.Enums;
 using MachineService.Common.Services;
+using MachineService.Server.Utility;
 
 namespace MachineService.Server.Behaviours;
 
@@ -31,7 +32,8 @@ namespace MachineService.Server.Behaviours;
 /// <param name="derivedConfig">The derived configuration</param>
 /// <param name="connectionList">The connection list service</param>
 /// <param name="statisticsGatherer">The statistics gatherer service</param>
-public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedConfig, ConnectionListService connectionList, IStatisticsGatherer statisticsGatherer) : IMessageBehavior
+/// <param name="gatewayConnectionList">The list of gateway connections</param>
+public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedConfig, ConnectionListService connectionList, IStatisticsGatherer statisticsGatherer, GatewayConnectionList gatewayConnectionList) : IMessageBehavior
 {
     /// <summary>
     /// The command this behavior handles
@@ -41,7 +43,7 @@ public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedC
     /// <inheritdoc />
     public async Task ExecuteAsync(SocketState state, EnvelopedMessage message)
     {
-        if (state is { Authenticated: true, OrganizationId: not null })
+        if (state is { Authenticated: true, OrganizationId: not null, ClientId: not null })
         {
             // now we get the list from status filtered by organizationId
             // This is a request command, its coming from portal or gateway
@@ -53,9 +55,19 @@ public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedC
             {
                 SocketState? destination = null;
                 destination = connectionList.FirstOrDefault(x => x.ClientId == message.To);
+
+                // Forward to relevant gateways
+                var any = await gatewayConnectionList.ForwardToRelevantGateways(envConfig.InstanceId!, message, state.OrganizationId, state.ClientId);
+
+                // Don't log a warning if we found any relevant gateway
+                if (any && destination is null)
+                {
+                    statisticsGatherer.Increment(StatisticsType.CommandRelaySuccess);
+                    return;
+                }
+
                 // We could have selected by organization id here, but specifically did not so we could
                 // detect a cross organization attack attempt at protocol level.
-
                 if (destination is not null && destination.OrganizationId == state.OrganizationId)
                 {
                     // Destination is registered, and belongs to the organization, relay
@@ -84,16 +96,21 @@ public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedC
                 }
                 else
                 {
-                    var response = new EnvelopedMessage
+                    // Only forward error if the sender is a portal,
+                    // as the agent has no use for the error message.
+                    if (state.Type == ConnectionType.Portal)
                     {
-                        Type = message.Type,
-                        From = envConfig.MachineName,
-                        MessageId = message.MessageId,
-                        To = message.From,
-                        ErrorMessage = ErrorMessages.DestinationNotAvailableForRelay
-                    };
+                        var response = new EnvelopedMessage
+                        {
+                            Type = message.Type,
+                            From = envConfig.InstanceId,
+                            MessageId = message.MessageId,
+                            To = message.From,
+                            ErrorMessage = ErrorMessages.DestinationNotAvailableForRelay
+                        };
 
-                    await state.WriteMessage(response, derivedConfig);
+                        await state.WriteMessage(response, derivedConfig);
+                    }
                     statisticsGatherer.Increment(StatisticsType.CommandRelayDestinationNotAvailable);
                 }
             }

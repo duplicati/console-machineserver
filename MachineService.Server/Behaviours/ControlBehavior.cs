@@ -18,30 +18,40 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using MachineService.Common;
 using MachineService.Common.Enums;
+using MachineService.Common.Exceptions;
 using MachineService.Common.Services;
+using MachineService.Server.Utility;
 
 namespace MachineService.Server.Behaviours;
 
 /// <summary>
 /// Handles response to control messages from agent to console
 /// </summary>
+/// <param name="envConfig">The environment configuration</param>
 /// <param name="pendingAgentControlService">The service for managing pending agent control messages</param>
 /// <param name="statisticsGatherer">The service for gathering statistics</param>
-public class ControlBehavior(IPendingAgentControlService pendingAgentControlService, IStatisticsGatherer statisticsGatherer) : IMessageBehavior
+/// <param name="gatewayConnectionList">The list of gateway connections</param>
+public class ControlBehavior(EnvironmentConfig envConfig, IPendingAgentControlService pendingAgentControlService, IStatisticsGatherer statisticsGatherer, GatewayConnectionList gatewayConnectionList) : IMessageBehavior
 {
     /// <inheritdoc />
     public static string Command => MessageTypes.Control.ToString().ToLowerInvariant();
 
     /// <inheritdoc />
-    public Task ExecuteAsync(SocketState state, EnvelopedMessage message)
+    public async Task ExecuteAsync(SocketState state, EnvelopedMessage message)
     {
         if (state is { Authenticated: true, OrganizationId: not null, ClientId: not null, Type: ConnectionType.Agent })
         {
             Log.Debug("Got response for control message from {From}@{OrganizationId} to {To}", message.From, state.OrganizationId, message.To);
 
-            var response = message.DeserializePayload<ControlResponseMessage>();
-            pendingAgentControlService.SetControlResponse(message.MessageId!, state.ClientId, response!);
+            var response = message.DeserializePayload<ControlResponseMessage>()
+                ?? throw new PolicyViolationException(ErrorMessages.InvalidControlResponsePayload);
+
+            // Notify locally, if the requester is still waiting on this machine
+            pendingAgentControlService.SetControlResponse(state.OrganizationId, state.ClientId, message.MessageId!, response!);
+            // Then forward to the relevant gateways, if any
+            await gatewayConnectionList.ForwardToRelevantGateways(envConfig.InstanceId!, message, state.OrganizationId, state.ClientId);
             statisticsGatherer.Increment(StatisticsType.ControlRelaySuccess);
         }
         else
@@ -49,7 +59,5 @@ public class ControlBehavior(IPendingAgentControlService pendingAgentControlServ
             Log.Warning($"Non authenticated agent, will not forward.");
             statisticsGatherer.Increment(StatisticsType.ControlRelayDestinationNotAuthenticated);
         }
-
-        return Task.CompletedTask;
     }
 }

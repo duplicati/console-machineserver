@@ -30,4 +30,11 @@ public interface IStatisticsPersistenceService
     /// <param name="statistics">The statistics to persist</param>
     /// <returns> A task representing the asynchronous operation</returns>
     Task PersistStatistics(Dictionary<string, ulong> statistics);
+
+    /// <summary>
+    /// Cleans up stale data from the database
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    public Task PurgeStaleData();
+
 }

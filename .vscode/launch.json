@@ -17,13 +17,86 @@
       "env": {
         "ASPNETCORE_URLS": "https://localhost:5003",
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ENVIRONMENT__MachineName": "debug-machine",
-        "ENVIRONMENT__IsProd": "false",
+        "ENVIRONMENT__MACHINENAME": "debug-machine",
+        "ENVIRONMENT__ISPROD": "false",
         "IPBLACKLIST__STORAGE": "file://.?pathmapped=true",
         "IPBLACKLIST__ENTRY": "ipblacklist-example.json",
         "DATABASE__CONNECTIONSTRING": "", // Set these in local.environmentvariables.json if needed
         "MESSAGING__CONNECTIONSTRING": ""
       }
+    },
+    {
+      "name": "Run Gateway Server",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build",
+      "program": "${workspaceFolder}/machineservice.server/bin/Debug/net8.0/machineservice.server.dll",
+      "args": [""],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_URLS": "https://localhost:5003",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ENVIRONMENT__MACHINENAME": "gateway-server",
+        "ENVIRONMENT__ISPROD": "false",
+        "ENVIRONMENT__GATEWAYPRESHAREDKEY": "debug-key1",
+        "ENVIRONMENT__GATEWAYMODE": "true"
+      }
+    },
+    {
+      "name": "Run Agent Server 1",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build",
+      "program": "${workspaceFolder}/machineservice.server/bin/Debug/net8.0/machineservice.server.dll",
+      "args": [""],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_URLS": "https://localhost:5004",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ENVIRONMENT__MACHINENAME": "gateway-client1",
+        "ENVIRONMENT__ISPROD": "false",
+        "ENVIRONMENT__GATEWAYPRESHAREDKEY": "debug-key1",
+        "ENVIRONMENT__GATEWAYMODE": "false",
+        "ENVIRONMENT__GATEWAYSERVERS": "wss://localhost:5003/gateway"
+      }
+    },
+    {
+      "name": "Run Agent Server 2",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build",
+      "program": "${workspaceFolder}/machineservice.server/bin/Debug/net8.0/machineservice.server.dll",
+      "args": [""],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_URLS": "https://localhost:5005",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ENVIRONMENT__MACHINENAME": "gateway-client2",
+        "ENVIRONMENT__ISPROD": "false",
+        "ENVIRONMENT__GATEWAYPRESHAREDKEY": "debug-key1",
+        "ENVIRONMENT__GATEWAYMODE": "false",
+        "ENVIRONMENT__GATEWAYSERVERS": "wss://localhost:5003/gateway"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run Gateway and single Agent Server",
+      "configurations": ["Run Gateway Server", "Run Agent Server 1"]
+    },
+    {
+      "name": "Run Gateway and two Agent Servers",
+      "configurations": [
+        "Run Gateway Server",
+        "Run Agent Server 1",
+        "Run Agent Server 2"
+      ]
     }
   ]
 }

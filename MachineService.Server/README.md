@@ -25,14 +25,19 @@ The following environment variables are optional, and should be considered for a
 | ------------------------------------------- | -------------------------------------------------------------------------------- |
 | DATABASE\_\_ADMINCONNECTIONSTRING           | Connectionstring for updating the schema                                         |
 | ENVIRONMENT\_\_MACHINENAME                  | Name of the machine for logging purposes                                         |
+| ENVIRONMENT\_\_INSTANCEID                   | Unique id for identifying the instance, auto assigned if not set                 |
 | ENVIRONMENT\_\_REDIRECTURL                  | Url to redirect to when visiting the root path                                   |
 | ENVIRONMENT\_\_VERIFYSCHEMA                 | Flag toggling if schema validation is performed                                  |
 | ENVIRONMENT\_\_GIT_COMMIT_VERSION           | The Git commit hash for logging (set in Docker image)                            |
+| ENVIRONMENT\_\_MAXMESSAGESIZE               | Maximum number of bytes allowed for a single authenticated message               |
 | ENVIRONMENT\_\_MAXBYTESBEFOREAUTHENTICATION | Maximum number of bytes allowed on an unauthenticated connection                 |
 | ENVIRONMENT\_\_WEBSOCKETRECEIVEBUFFERSIZE   | The size of the receive buffer for websocket messages, in bytes                  |
 | ENVIRONMENT\_\_SECONDSBETWEENSTATISTICS     | The number of seconds between writing machine service statistics to the database |
 | ENVIRONMENT\_\_STATUSREPORTINTERVALSECONDS  | The number of seconds between logged status reports                              |
 | ENVIRONMENT\_\_PRECOMPILEDDBCLASSES         | Set this if the compilation has already complied the database classes            |
+| ENVIRONMENT\_\_GATEWAYPRESHAREDKEY          | A pre-shared key used to authenticating gateways and servers                     |
+| ENVIRONMENT\_\_LICENSEKEY                   | A license key; required if using any proprietary features                        |
+| ENVIRONMENT\_\_STATISTICSRETENTIONDAYS      | Number of days to retain statistics in the database                              |
 | CORS\_\_ALLOWEDORIGINS                      | Semicolon-separated list of allowed CORS origins                                 |
 | IPBLACKLIST\_\_STORAGE                      | The KVPSButter connection string to the storage that contains an IP blacklist    |
 | IPBLACKLIST\_\_ENTRY                        | The key that contains the IP blacklist                                           |

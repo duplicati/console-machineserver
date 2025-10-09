@@ -27,17 +27,19 @@ public interface IPendingAgentControlService
     /// <summary>
     /// Registers a pending control response for the given message ID and agent ID.
     /// </summary>
-    /// <param name="messageId">The message ID</param>
+    /// <param name="organizationId">The organization ID</param>
     /// <param name="clientId">The client ID</param>
+    /// <param name="messageId">The message ID</param>
     /// <param name="ct">The cancellation token</param>
     /// <returns>The task representing the pending control response</returns>
-    Task<ControlResponseMessage> PrepareForControlResponse(string messageId, string clientId, CancellationToken ct);
+    Task<ControlResponseMessage> PrepareForControlResponse(string organizationId, string clientId, string messageId, CancellationToken ct);
 
     /// <summary>
     /// Sets the control response for the given message ID and agent ID.
     /// </summary>
-    /// <param name="messageId">The message ID</param>
+    /// <param name="organizationId">The organization ID</param>
     /// <param name="clientId">The client ID</param>
+    /// <param name="messageId">The message ID</param>
     /// <param name="response">The control response message</param>
-    void SetControlResponse(string messageId, string clientId, ControlResponseMessage response);
+    void SetControlResponse(string organizationId, string clientId, string messageId, ControlResponseMessage response);
 }

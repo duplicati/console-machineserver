@@ -77,4 +77,28 @@ public static class ErrorMessages
     /// Too much data sent on websocket, will close connection
     /// </summary>
     public const string TooMuchDataWithoutAuthentication = "Too much data sent on websocket before authentication, will close connection";
+
+    /// <summary>
+    /// Agent connecting to gateway
+    /// </summary>
+    public const string AgentConnectingToGateway = "Agent connecting to gateway";
+
+    /// <summary>
+    /// Incorrect gateway handshake
+    /// </summary>
+    public const string IncorrectGatewayHandshake = "Incorrect gateway handshake";
+
+    /// <summary>
+    /// Not authenticated
+    /// </summary>
+    public const string NotAuthenticated = "Not authenticated";
+    /// <summary>
+    /// Invalid control response payload
+    /// </summary>
+    public const string InvalidControlResponsePayload = "Invalid control response payload";
+
+    /// <summary>
+    /// Invalid proxy payload
+    /// </summary>
+    public const string InvalidProxyPayload = "Invalid proxy payload";
 }

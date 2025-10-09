@@ -17,6 +17,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+using MachineService.Common.Model;
 using MachineService.State.Interfaces;
 using Marten;
 using Serilog;
@@ -27,8 +28,9 @@ namespace MachineService.State.Services;
 /// <summary>
 /// Implementation for managing persisting statistics for the machineservice server
 /// </summary>
-/// <param name="connectionString"></param>
-public class StatisticsPersistenceService(IDocumentStore store) : IStatisticsPersistenceService
+/// <param name="config">The environment configuration</param>
+/// <param name="store">The MartenDB document store</param>
+public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentStore store) : IStatisticsPersistenceService
 {
     /// <summary>
     /// The record for storing statistics entries
@@ -55,6 +57,15 @@ public class StatisticsPersistenceService(IDocumentStore store) : IStatisticsPer
         {
             Log.Error(ex, "Error persisting statistics: {Error}");
         }
+    }
+
+    /// <inheritdoc/>
+    public Task PurgeStaleData()
+    {
+        var expirationTime = DateTimeOffset.UtcNow - TimeSpan.FromDays(config.StatisticsRetentionDays);
+        using var session = store.LightweightSession();
+        session.DeleteWhere<StatisticsEntry>(x => x.CreatedAt < expirationTime);
+        return session.SaveChangesAsync();
     }
 
     /// <summary>

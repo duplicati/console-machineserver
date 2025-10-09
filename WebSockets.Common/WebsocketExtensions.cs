@@ -58,7 +58,7 @@ public static class WebsocketExtensions
     /// <param name="webSocket">The websocket to write to</param>
     /// <param name="message">The message to send</param>
     /// <returns>The number of bytes written</returns>
-    public static async Task<int> WriteString(this WebSocket webSocket, string message)
+    private static async Task<int> WriteString(this WebSocket webSocket, string message)
     {
         Log.Debug("SocketLevel Write: {message}", message);
 
@@ -87,16 +87,21 @@ public static class WebsocketExtensions
     /// <returns>A task representing the asynchronous operation</returns>
     public static async Task TerminateWithPolicyViolation(this WebSocket webSocket, string message)
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
             Log.Warning($"Terminating websocket by PolicyViolation {message}");
             await webSocket.CloseAsync(WebSocketCloseStatus.PolicyViolation,
                 message,
-                CancellationToken.None);
+                cts.Token);
         }
         catch
         {
             // Ignored
+        }
+        finally
+        {
+            cts.Cancel();
         }
     }
 

@@ -36,26 +36,31 @@ public class InMemoryStateManagerService : IStateManagerService
     /// </summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ClientRegistration>> _registrations = new ConcurrentDictionary<string, ConcurrentDictionary<string, ClientRegistration>>();
 
+    /// <summary>
+    /// The timeout after which a client is considered inactive and removed from the list.
+    /// </summary>
+    private static readonly TimeSpan ClientTimeout = TimeSpan.FromMinutes(30);
+
     /// <inheritdoc />
-    public Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string machineServerUri, string? clientIp)
+    public Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
         orgDict.AddOrUpdate(clientId, _ => new ClientRegistration()
         {
             ClientId = clientId,
-            MachineServerUri = machineServerUri,
             OrganizationId = organizationId,
             MachineRegistrationId = registeredAgentId,
             ClientVersion = clientVersion,
             LastUpdatedOn = DateTimeOffset.UtcNow,
             Type = clientType,
+            GatewayId = gatewayId ?? "",
         }, (_, existing) => existing with
         {
             LastUpdatedOn = DateTimeOffset.UtcNow,
-            MachineServerUri = machineServerUri,
             MachineRegistrationId = registeredAgentId,
             ClientVersion = clientVersion,
             Type = clientType,
+            GatewayId = gatewayId ?? ""
         });
 
         return Task.FromResult(true);
@@ -87,13 +92,41 @@ public class InMemoryStateManagerService : IStateManagerService
         return Task.FromResult(true);
     }
 
-    /// <inheritdoc />
-    public Task<List<ClientRegistration>> GetClients(string organizationId)
+    /// <summary>
+    /// Gets the list of active connections for the specified organization and client type.
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="clientType">The client type</param>
+    /// <returns>A list of active connections</returns>
+    public Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
         var registrations = orgDict.Values
-            .Where(x => !x.ClientId.StartsWith("portal-client"))
+            .Where(x => x.Type == clientType)
+            .Where(x => x.LastUpdatedOn >= DateTimeOffset.UtcNow - ClientTimeout)
             .ToList();
         return Task.FromResult(registrations);
     }
+
+    /// <inheritdoc />
+    public async Task<List<ClientRegistration>> GetAgents(string organizationId)
+        => await GetConnections(organizationId, ConnectionType.Agent);
+
+    /// <inheritdoc />
+    public async Task<List<ClientRegistration>> GetPortals(string organizationId)
+        => await GetConnections(organizationId, ConnectionType.Portal);
+
+    /// <inheritdoc />
+    public Task PurgeStaleData()
+    {
+        var expires = DateTimeOffset.UtcNow - ClientTimeout;
+        foreach (var orgDict in _registrations.Values)
+        {
+            var toRemove = orgDict.Where(kvp => kvp.Value.LastUpdatedOn < expires).Select(kvp => kvp.Key).ToList();
+            foreach (var key in toRemove)
+                orgDict.TryRemove(key, out _);
+        }
+        return Task.CompletedTask;
+    }
+
 }

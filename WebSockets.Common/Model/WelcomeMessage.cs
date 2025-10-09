@@ -25,9 +25,11 @@ namespace WebSockets.Common.Model;
 /// <param name="PublicKeyHash">The SHA256 hash of the server's public key in PEM format</param>
 /// <param name="MachineName">The name of the machine the server is running on</param>
 /// <param name="ServerVersion">The version of the server</param>
+/// <param name="Nonce">A random nonce to be used for authentication</param>
 /// <param name="SupportedProtocolVersions">The list of the server's supported protocol versions</param>
 public sealed record WelcomeMessage(
     string PublicKeyHash,
     string MachineName,
     string ServerVersion,
+    string? Nonce,
     IEnumerable<int> SupportedProtocolVersions);
