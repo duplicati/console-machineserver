@@ -115,7 +115,7 @@ public class InMemoryStateManagerServiceTests
     public async Task GetClients_WithClients_ReturnsClientsExcludingPortalClients()
     {
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri", "ip");
-        await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "portal-client1", "org1", "agent2", "1.0", "uri", "ip");
+        await _service.RegisterClient(ConnectionType.Portal, Guid.NewGuid(), "portal-client1", "org1", "agent2", "1.0", "uri", "ip");
 
         var clients = await _service.GetAgents("org1");
 
