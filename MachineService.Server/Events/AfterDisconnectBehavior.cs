@@ -25,7 +25,7 @@ using MachineService.State.Interfaces;
 namespace MachineService.Server.Events;
 
 /// <summary>
-/// This class is responsible for handling the behavior of the server after a client has been authenticated.
+/// This class is responsible for handling the behavior of the server after a client disconnects.
 /// </summary>
 /// <param name="envConfig">DI Injected settings</param>
 /// <param name="listBehavior">DI Injected behavior to process the virtual list commands</param>

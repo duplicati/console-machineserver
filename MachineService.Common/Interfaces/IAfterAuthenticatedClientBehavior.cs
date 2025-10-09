@@ -20,7 +20,7 @@
 namespace MachineService.Common.Interfaces;
 
 /// <summary>
-/// Interfaces used to identify event behavior class for AfterAuthenticated event behavior handler
+/// Interface for post-authentication behavior specific to agent clients, handling activity tracking and list synchronization.
 /// </summary>
 public interface IAfterAuthenticatedClientBehavior
 {

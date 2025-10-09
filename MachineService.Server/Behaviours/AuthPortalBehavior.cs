@@ -26,7 +26,7 @@ using MachineService.State.Interfaces;
 namespace MachineService.Server.Behaviours;
 
 /// <summary>
-/// Behavior for handling authentication messages from Portal clients
+/// Behavior for handling authentication messages from Portal clients. Does not include post-authentication hooks as portals do not require activity tracking.
 /// </summary>
 /// <param name="envConfig">The environment configuration</param>
 /// <param name="derivedConfig">The derived configuration</param>
@@ -51,7 +51,7 @@ public class AuthPortalBehavior(
 
         // We only accept authportal from clients originally identified as Portal
         // via the route on the connection, who would be in the following states
-        // The reason we allow Authenticated to call it again, is to allow easy an
+        // The reason we allow Authenticated to call it again, is to allow an easy
         // way to keep a connection by simply authenticating again in the same socket.
         if (!new List<ConnectionState>
             {
