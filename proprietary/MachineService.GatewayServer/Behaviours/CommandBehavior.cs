@@ -38,7 +38,7 @@ public class CommandBehavior(
         if (state is { Authenticated: true, OrganizationId: not null, ConnectionState: ConnectionState.ConnectedPortalAuthenticated })
         {
             Log.Debug("Relaying command message from {From}@{OrganizationId} to {To}", message.From, state.OrganizationId, message.To);
-            var targetClient = (await stateManagerService.GetAgents(state.OrganizationId))
+            var targetClient = (await stateManagerService.GetAgents(state.OrganizationId, CancellationToken.None))
                 .FirstOrDefault(x => x.Type == ConnectionType.Agent && x.ClientId == message.To);
 
             var destination = connectionList.FirstOrDefault(x => x.ClientId == targetClient?.GatewayId && x.Type == ConnectionType.Gateway);

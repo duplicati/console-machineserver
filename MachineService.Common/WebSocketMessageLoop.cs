@@ -21,6 +21,7 @@ using System.Net.WebSockets;
 using System.Text;
 using MachineService.Common.Exceptions;
 using MachineService.Common.Interfaces;
+using MachineService.Common.Services;
 using MachineService.Common.Util;
 using MachineService.Server.Model;
 using Serilog;
@@ -38,12 +39,14 @@ namespace MachineService.Common;
 /// <param name="onAfterDisconnect">The behavior to execute after disconnect</param>
 /// <param name="socketState">The current socket state</param>
 /// <param name="messageHandlerFactory">The factory to create message handlers</param>
+/// <param name="connectionManager">The WebSocket connection manager for shutdown coordination</param>
 public class WebSocketMessageLoop(ServerStatistics serverStatistics,
     EnvironmentConfig settings,
     DerivedConfig derivedConfig,
     IAfterDisconnectBehavior? onAfterDisconnect,
     SocketState socketState,
-    Func<string, IMessageBehavior?> messageHandlerFactory)
+    Func<string, IMessageBehavior?> messageHandlerFactory,
+    WebSocketConnectionManager connectionManager)
 {
     /// <summary>
     /// Runs the message loop, receiving messages and processing them.
@@ -52,6 +55,11 @@ public class WebSocketMessageLoop(ServerStatistics serverStatistics,
     /// <returns>A task representing the asynchronous operation</returns>
     public async Task RunMessageLoop(CancellationToken cancellationToken)
     {
+        // Combine application shutdown token with request cancellation
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            connectionManager.ShutdownToken);
+
         try
         {
             await socketState.ReceiveMessages(
@@ -59,11 +67,16 @@ public class WebSocketMessageLoop(ServerStatistics serverStatistics,
                 settings.WebsocketReceiveBufferSize,
                 settings.MaxBytesBeforeAuthentication,
                 settings.MaxMessageSize,
-                cancellationToken);
+                linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (connectionManager.ShutdownToken.IsCancellationRequested)
+        {
+            Log.Information("WebSocket loop cancelled due to application shutdown for client {ClientId}",
+                socketState.ClientId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // This is expected when the service is stopping, nothing to be done.
+            // This is expected when the request is cancelled, nothing to be done.
         }
         catch (WebSocketException wse)
         {

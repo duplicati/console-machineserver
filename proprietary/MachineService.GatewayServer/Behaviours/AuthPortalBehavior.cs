@@ -76,7 +76,7 @@ public class AuthPortalBehavior(
             state.ClientVersion = authRequest.ClientVersion;
             state.ConnectionState = ConnectionState.ConnectedPortalAuthenticated;
             await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId, state.OrganizationId!,
-                state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress);
+                state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress, CancellationToken.None);
         }
 
         var response = new EnvelopedMessage

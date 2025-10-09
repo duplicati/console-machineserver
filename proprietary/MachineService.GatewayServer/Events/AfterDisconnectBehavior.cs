@@ -25,7 +25,7 @@ public class GatewayAfterDisconnectBehavior(IStateManagerService stateManagerSer
             {
                 if (state.ConnectionState is ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated or ConnectionState.ConnectedGatewayAuthenticated)
                 {
-                    await stateManagerService.DeRegisterClient(state.ConnectionId, state.ClientId ?? "", state.OrganizationId ?? "", state.BytesReceived, state.BytesSent);
+                    await stateManagerService.DeRegisterClient(state.ConnectionId, state.ClientId ?? "", state.OrganizationId ?? "", state.BytesReceived, state.BytesSent, CancellationToken.None);
                     Log.Debug($"Client disconnected {state.ClientId} and removed from state manager.");
                 }
             }

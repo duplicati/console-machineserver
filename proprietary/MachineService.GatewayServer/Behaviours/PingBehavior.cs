@@ -36,7 +36,7 @@ public class PingBehavior(
         // If authenticated and connected, refresh the client registration
         if (state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedPortalAuthenticated or ConnectionState.ConnectedGatewayAuthenticated })
         {
-            await stateManagerService.UpdateClientActivity(state.ClientId ?? "", state.OrganizationId ?? "");
+            await stateManagerService.UpdateClientActivity(state.ClientId ?? "", state.OrganizationId ?? "", CancellationToken.None);
 
             statisticsGatherer.Increment(StatisticsType.PingCommandSuccess);
             await state.WriteMessage(new EnvelopedMessage

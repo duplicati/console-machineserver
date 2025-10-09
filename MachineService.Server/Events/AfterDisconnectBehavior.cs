@@ -53,7 +53,7 @@ public class AfterDisconnectBehavior(
             {
                 if (state.ConnectionState is ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated)
                 {
-                    await stateManagerService.DeRegisterClient(state.ConnectionId, state.ClientId ?? "", state.OrganizationId ?? "", state.BytesReceived, state.BytesSent);
+                    await stateManagerService.DeRegisterClient(state.ConnectionId, state.ClientId ?? "", state.OrganizationId ?? "", state.BytesReceived, state.BytesSent, CancellationToken.None);
                     Log.Debug($"Client disconnected {state.ClientId} and removed from state manager.");
 
                     if (state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated })
@@ -69,8 +69,8 @@ public class AfterDisconnectBehavior(
 
             if (state.ConnectionState is ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated && !string.IsNullOrWhiteSpace(state.OrganizationId))
             {
-                await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId);
-                await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId);
+                await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId, CancellationToken.None);
+                await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId, CancellationToken.None);
             }
         }
         catch (Exception e)

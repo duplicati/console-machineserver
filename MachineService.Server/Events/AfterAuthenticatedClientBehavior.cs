@@ -55,8 +55,8 @@ public class AfterAuthenticatedClientBehavior(
 
                 if (!string.IsNullOrWhiteSpace(state.OrganizationId))
                 {
-                    await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId);
-                    await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId);
+                    await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId, CancellationToken.None);
+                    await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId, CancellationToken.None);
                 }
             }
         }

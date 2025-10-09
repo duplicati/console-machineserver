@@ -35,7 +35,7 @@ public class AgentControlCommandRequestHandler(
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<AgentControlCommandRequest> context)
     {
-        var targetClient = (await stateManagerService.GetAgents(context.Message.OrganizationId))
+        var targetClient = (await stateManagerService.GetAgents(context.Message.OrganizationId, CancellationToken.None))
             .FirstOrDefault(x => x.Type == ConnectionType.Agent && x.MachineRegistrationId == context.Message.AgentId);
 
         var destination = connectionList.FirstOrDefault(x => x.ClientId == targetClient?.GatewayId && x.Type == ConnectionType.Gateway);

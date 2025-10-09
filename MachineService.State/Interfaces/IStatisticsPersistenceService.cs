@@ -28,13 +28,15 @@ public interface IStatisticsPersistenceService
     /// Persists the provided statistics to the database
     /// </summary>
     /// <param name="statistics">The statistics to persist</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns> A task representing the asynchronous operation</returns>
-    Task PersistStatistics(Dictionary<string, ulong> statistics);
+    Task PersistStatistics(Dictionary<string, ulong> statistics, CancellationToken cancellationToken);
 
     /// <summary>
     /// Cleans up stale data from the database
     /// </summary>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    public Task PurgeStaleData();
+    public Task PurgeStaleData(CancellationToken cancellationToken);
 
 }

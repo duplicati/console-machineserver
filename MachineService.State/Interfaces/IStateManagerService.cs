@@ -39,16 +39,18 @@ public interface IStateManagerService
     /// <param name="machineServer">The machine server URI</param>
     /// <param name="gatewayId">The gateway ID</param>
     /// <param name="clientIp">The client IP address</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns><c>true</c> if the client was registered; otherwise, <c>false</c>.</returns>
-    Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp);
+    Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp, CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates the activity timestamp for a client
     /// </summary>
     /// <param name="clientId">The client ID</param>
     /// <param name="organizationId">The organization ID</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns><c>true</c> if the client activity was updated; otherwise,
-    Task<bool> UpdateClientActivity(string clientId, string organizationId);
+    Task<bool> UpdateClientActivity(string clientId, string organizationId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deregisters a client with the state manager
@@ -58,26 +60,30 @@ public interface IStateManagerService
     /// <param name="organizationId">The organization ID</param>
     /// <param name="bytesReceived">The number of bytes received</param>
     /// <param name="bytesSent">The number of bytes sent</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns><c>true</c> if the client was deregistered; otherwise, <c>false</c>.</returns>
-    Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent);
+    Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the list of active agents for the specified organization
     /// </summary>
     /// <param name="organizationId">The organization ID</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A list of active agents</returns>
-    public Task<List<ClientRegistration>> GetAgents(string organizationId);
+    public Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the list of active portals for the specified organization
     /// </summary>
     /// <param name="organizationId">The organization ID</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A list of active portals</returns>
-    public Task<List<ClientRegistration>> GetPortals(string organizationId);
+    public Task<List<ClientRegistration>> GetPortals(string organizationId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Cleans up stale data from the state manager
     /// </summary>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    public Task PurgeStaleData();
+    public Task PurgeStaleData(CancellationToken cancellationToken);
 }

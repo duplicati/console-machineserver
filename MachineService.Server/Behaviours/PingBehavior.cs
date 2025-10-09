@@ -52,7 +52,7 @@ public class PingBehavior(
 
         // If authenticated and connected, refresh the client registration
         if (state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated })
-            await stateManagerService.UpdateClientActivity(state.ClientId ?? "", state.OrganizationId ?? "");
+            await stateManagerService.UpdateClientActivity(state.ClientId ?? "", state.OrganizationId ?? "", CancellationToken.None);
 
         if (!settings.DisablePingMessages && state is { Authenticated: true, ConnectionState: ConnectionState.ConnectedAgentAuthenticated })
             await publishAgentActivityService.Publish(new AgentActivityMessage(ActivityType.Ping,

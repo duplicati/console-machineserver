@@ -76,12 +76,12 @@ public class AuthGatewayBehavior(
             throw new PolicyViolationException(ErrorMessages.IncorrectGatewayHandshake);
         }
 
-        // We now consider the caller authenticated  
+        // We now consider the caller authenticated
         state.ClientId = message.From!;
         state.ConnectionState = ConnectionState.ConnectedGatewayAuthenticated;
 
         await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId, state.OrganizationId!,
-            state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress);
+            state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress, CancellationToken.None);
 
         // Create a response hash, using the PSK, the hash provided by the caller, and the nonce provided by the caller
         // The caller can now verify that we know the PSK as well

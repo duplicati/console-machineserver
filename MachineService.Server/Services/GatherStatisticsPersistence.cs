@@ -51,7 +51,7 @@ public class GatherStatisticsPersistence(EnvironmentConfig environmentConfig, IS
                         Console.WriteLine($"{kvp.Key,-40}\t{kvp.Value}");
 
                     await scope.ServiceProvider.GetRequiredService<IStatisticsPersistenceService>()
-                        .PersistStatistics(statistics.ToDictionary(k => k.Key.ToString(), k => k.Value));
+                        .PersistStatistics(statistics.ToDictionary(k => k.Key.ToString(), k => k.Value), stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

@@ -34,13 +34,16 @@ public static class ForwardListUpdateMessages
     /// <param name="stateManagerService">The state manager service</param>
     /// <param name="instanceId">The instance ID</param>
     /// <param name="organizationId">The organization ID</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    public static async Task ForwardListUpdateToRelevantGateways(GatewayConnectionList gatewayConnectionList, IStateManagerService stateManagerService, string instanceId, string organizationId)
+    public static async Task ForwardListUpdateToRelevantGateways(GatewayConnectionList gatewayConnectionList, IStateManagerService stateManagerService, string instanceId, string organizationId, CancellationToken cancellationToken)
     {
-        foreach (var portalInstance in await stateManagerService.GetPortals(organizationId))
+        foreach (var portalInstance in await stateManagerService.GetPortals(organizationId, cancellationToken))
         {
             foreach (var gatewayServer in gatewayConnectionList.Where(x => x.ClientId == portalInstance.GatewayId))
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     var message = new EnvelopedMessage
@@ -76,8 +79,9 @@ public static class ForwardListUpdateMessages
     /// <param name="listBehavior">The list behavior to execute</param>
     /// <param name="instanceId">The instance ID</param>
     /// <param name="organizationId">The organization ID</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task that represents the asynchronous operation</returns>
-    public static async Task ForwardListUpdateToConnectedClients(this ConnectionListService connectionListService, ListBehavior listBehavior, string instanceId, string organizationId)
+    public static async Task ForwardListUpdateToConnectedClients(this ConnectionListService connectionListService, ListBehavior listBehavior, string instanceId, string organizationId, CancellationToken cancellationToken)
     {
         // Proactively send the list of connected clients to all existing and authenticated
         // portal connections
@@ -91,6 +95,8 @@ public static class ForwardListUpdateMessages
 
             // Send the list of connected clients to the authenticated portal, we do that
             // by emulating a list command, so we have use the built-in ListBehavior
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             try
             {

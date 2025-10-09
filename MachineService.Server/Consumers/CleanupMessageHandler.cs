@@ -47,7 +47,7 @@ namespace MachineService.Server.Consumers
 
             try
             {
-                await stateManagerService.PurgeStaleData();
+                await stateManagerService.PurgeStaleData(CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -57,7 +57,7 @@ namespace MachineService.Server.Consumers
 
             try
             {
-                await statisticsPersistenceService.PurgeStaleData();
+                await statisticsPersistenceService.PurgeStaleData(CancellationToken.None);
             }
             catch (Exception ex)
             {

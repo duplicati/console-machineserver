@@ -41,7 +41,7 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
     public sealed record StatisticsEntry(string Id, DateTime CreatedAt, Dictionary<string, ulong> Statistics);
 
     /// <inheritdoc/>
-    public async Task PersistStatistics(Dictionary<string, ulong> statistics)
+    public async Task PersistStatistics(Dictionary<string, ulong> statistics, CancellationToken cancellationToken)
     {
         if (statistics == null || statistics.Count == 0)
             return;
@@ -51,7 +51,7 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
         session.Insert(entry);
         try
         {
-            await session.SaveChangesAsync();
+            await session.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -60,12 +60,12 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
     }
 
     /// <inheritdoc/>
-    public Task PurgeStaleData()
+    public Task PurgeStaleData(CancellationToken cancellationToken)
     {
         var expirationTime = DateTimeOffset.UtcNow - TimeSpan.FromDays(config.StatisticsRetentionDays);
         using var session = store.LightweightSession();
         session.DeleteWhere<StatisticsEntry>(x => x.CreatedAt < expirationTime);
-        return session.SaveChangesAsync();
+        return session.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

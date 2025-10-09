@@ -29,7 +29,7 @@ namespace MachineService.State.Services;
 /// <summary>
 /// State manager service implementation using MartenDB as the backing store
 /// </summary>
-/// <param name="session">The MartenDB document session</param>
+/// <param name="store">The MartenDB document store</param>
 /// <param name="environmentConfig">The environment configuration</param>
 public class StateManagerService(IDocumentStore store, EnvironmentConfig environmentConfig) : IStateManagerService
 {
@@ -152,12 +152,13 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
 
     /// <inheritdoc />
     public async Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId,
-        string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp)
+        string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp,
+        CancellationToken cancellationToken)
     {
         using (var session = store.LightweightSession())
         {
-            var current = session.Query<ActiveConnection>()
-                .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+            var current = await session.Query<ActiveConnection>()
+                .FirstOrDefaultAsync(x => x.ClientId == clientId && x.OrganizationId == organizationId, cancellationToken);
 
             if (current == null)
             {
@@ -188,7 +189,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             }
 
             session.Store(current);
-            await session.SaveChangesAsync();
+            await session.SaveChangesAsync(cancellationToken);
         }
 
         if (!environmentConfig.DisableDatabaseClientHistory)
@@ -209,7 +210,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
                     ConnectionId: connectionId.ToString(),
                     ClientIp: clientIp,
                     ClientType: clientType));
-                await historySession.SaveChangesAsync();
+                await historySession.SaveChangesAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -221,13 +222,13 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
 
 
     /// <inheritdoc />
-    public async Task<bool> UpdateClientActivity(string clientId, string organizationId)
+    public async Task<bool> UpdateClientActivity(string clientId, string organizationId, CancellationToken cancellationToken)
     {
         try
         {
             using var session = store.LightweightSession();
-            var current = session.Query<ActiveConnection>()
-                .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+            var current = await session.Query<ActiveConnection>()
+                .FirstOrDefaultAsync(x => x.ClientId == clientId && x.OrganizationId == organizationId, cancellationToken);
 
             if (current == null)
                 return false;
@@ -235,7 +236,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             current.LastUpdateOn = DateTimeOffset.UtcNow;
 
             session.Store(current);
-            await session.SaveChangesAsync();
+            await session.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -247,7 +248,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
 
 
     /// <inheritdoc />
-    public async Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent)
+    public async Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent, CancellationToken cancellationToken)
     {
         var result = true;
         try
@@ -255,7 +256,12 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             using var session = store.LightweightSession();
             if (!string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(organizationId))
                 session.DeleteWhere<ActiveConnection>(x => x.ClientId == clientId && x.OrganizationId == organizationId);
-            await session.SaveChangesAsync();
+            await session.SaveChangesAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Log.Warning(ex, "Database pool disposed during deregistration for client {ClientId} - application shutting down", clientId);
+            return false;
         }
         catch (Exception ex)
         {
@@ -275,7 +281,11 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
                     BytesReceived: bytesReceived,
                     BytesSent: bytesSent,
                     ConnectionId: connectionId.ToString()));
-                await historySession.SaveChangesAsync();
+                await historySession.SaveChangesAsync(cancellationToken);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Log.Debug(ex, "Database pool disposed during history logging - application shutting down");
             }
             catch (Exception ex)
             {
@@ -291,8 +301,9 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// </summary>
     /// <param name="organizationId">The organization ID</param>
     /// <param name="clientType">The client type</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A list of active connections</returns>
-    private async Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType)
+    private async Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType, CancellationToken cancellationToken)
     {
         var expirationTime = DateTimeOffset.UtcNow - ClientTimeout;
         using var session = store.LightweightSession();
@@ -300,7 +311,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             .Where(x => x.OrganizationId == organizationId)
             .Where(x => x.LastUpdateOn >= expirationTime)
             .Where(x => x.ClientType == clientType)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return registrations.Select(x => new ClientRegistration()
         {
@@ -315,15 +326,15 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     }
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetAgents(string organizationId)
-        => await GetConnections(organizationId, ConnectionType.Agent);
+    public async Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken)
+        => await GetConnections(organizationId, ConnectionType.Agent, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetPortals(string organizationId)
-        => await GetConnections(organizationId, ConnectionType.Portal);
+    public async Task<List<ClientRegistration>> GetPortals(string organizationId, CancellationToken cancellationToken)
+        => await GetConnections(organizationId, ConnectionType.Portal, cancellationToken);
 
     /// <inheritdoc />
-    public Task PurgeStaleData()
+    public async Task PurgeStaleData(CancellationToken cancellationToken)
     {
         using var session = store.LightweightSession();
 
@@ -336,7 +347,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
             session.DeleteWhere<ClientRegisterHistory>(x => x.RegisteredOn < expirationTimeActivityLog);
             session.DeleteWhere<ClientUnregisterHistory>(x => x.UnregisterOn < expirationTimeActivityLog);
         }
-        return session.SaveChangesAsync();
+        await session.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

@@ -136,6 +136,10 @@ builder.Services.AddCors(options =>
         });
 });
 
+// Register WebSocket connection manager first to ensure it stops before database
+builder.Services.AddSingleton<WebSocketConnectionManager>()
+    .AddHostedService(sp => sp.GetRequiredService<WebSocketConnectionManager>());
+
 builder.Services.AddSingleton(envConfig)
     .AddSingleton(DerivedConfig.Create(Base64PemReader.Read(envConfig.MachineServerPrivate), envConfig.MachineServerKeyExpires!.Value))
     .AddScoped<IBackendRelayConnection, BackendRelayConnection>()
@@ -321,9 +325,24 @@ if (!envConfig.IsProd)
         c.DocumentFilter<ExportTypeFilter>();
     });
 builder.Services.AddControllers();
+
+// Configure shutdown timeout to allow graceful WebSocket closure
+builder.Host.ConfigureHostOptions(opts =>
+{
+    opts.ShutdownTimeout = TimeSpan.FromSeconds(30);
+});
+
 var app = builder.Build();
 
 app.UseCommonLogging();
+
+// Log shutdown events
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+lifetime.ApplicationStopping.Register(() =>
+    Log.Information("Application stopping - WebSocket manager will close connections"));
+lifetime.ApplicationStopped.Register(() =>
+    Log.Information("Application stopped - all resources cleaned up"));
+
 
 app.UseSimpleSecurityFilter(securityconfig);
 

@@ -42,7 +42,7 @@ public class InMemoryStateManagerService : IStateManagerService
     private static readonly TimeSpan ClientTimeout = TimeSpan.FromMinutes(30);
 
     /// <inheritdoc />
-    public Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp)
+    public Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId, string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp, CancellationToken cancellationToken)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
         orgDict.AddOrUpdate(clientId, _ => new ClientRegistration()
@@ -67,7 +67,7 @@ public class InMemoryStateManagerService : IStateManagerService
     }
 
     /// <inheritdoc />
-    public Task<bool> UpdateClientActivity(string clientId, string organizationId)
+    public Task<bool> UpdateClientActivity(string clientId, string organizationId, CancellationToken cancellationToken)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
 
@@ -85,7 +85,7 @@ public class InMemoryStateManagerService : IStateManagerService
     }
 
     /// <inheritdoc />
-    public Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent)
+    public Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent, CancellationToken cancellationToken)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
         orgDict.TryRemove(clientId, out _);
@@ -98,7 +98,7 @@ public class InMemoryStateManagerService : IStateManagerService
     /// <param name="organizationId">The organization ID</param>
     /// <param name="clientType">The client type</param>
     /// <returns>A list of active connections</returns>
-    public Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType)
+    public Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType, CancellationToken cancellationToken)
     {
         var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
         var registrations = orgDict.Values
@@ -109,15 +109,15 @@ public class InMemoryStateManagerService : IStateManagerService
     }
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetAgents(string organizationId)
-        => await GetConnections(organizationId, ConnectionType.Agent);
+    public async Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken)
+        => await GetConnections(organizationId, ConnectionType.Agent, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetPortals(string organizationId)
-        => await GetConnections(organizationId, ConnectionType.Portal);
+    public async Task<List<ClientRegistration>> GetPortals(string organizationId, CancellationToken cancellationToken)
+        => await GetConnections(organizationId, ConnectionType.Portal, cancellationToken);
 
     /// <inheritdoc />
-    public Task PurgeStaleData()
+    public Task PurgeStaleData(CancellationToken cancellationToken)
     {
         var expires = DateTimeOffset.UtcNow - ClientTimeout;
         foreach (var orgDict in _registrations.Values)

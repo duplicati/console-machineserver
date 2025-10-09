@@ -40,7 +40,7 @@ public class ListBehavior(
             if (state.ConnectionState != ConnectionState.ConnectedPortalAuthenticated)
                 throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForList);
 
-            var agentsForOrganization = await stateManagerService.GetAgents(state.OrganizationId);
+            var agentsForOrganization = await stateManagerService.GetAgents(state.OrganizationId, CancellationToken.None);
             Log.Debug("Returning {Count} clients for organization {OrganizationId}", agentsForOrganization.Count, state.OrganizationId);
 
             await state.WriteMessage(new EnvelopedMessage

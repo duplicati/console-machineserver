@@ -27,10 +27,10 @@ namespace MachineService.State.Services;
 public class InMemoryStatisticsPersistenceService : IStatisticsPersistenceService
 {
     /// <inheritdoc/>
-    public Task PersistStatistics(Dictionary<string, ulong> statistics)
+    public Task PersistStatistics(Dictionary<string, ulong> statistics, CancellationToken cancellationToken)
         => Task.CompletedTask; // No-op for in-memory implementation
 
     /// <inheritdoc/>
-    public Task PurgeStaleData()
+    public Task PurgeStaleData(CancellationToken cancellationToken)
         => Task.CompletedTask; // No-op for in-memory implementation
 }
