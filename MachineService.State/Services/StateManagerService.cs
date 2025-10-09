@@ -21,6 +21,7 @@ using MachineService.Common.Model;
 using MachineService.State.Interfaces;
 using MachineService.State.Model;
 using Marten;
+using Serilog;
 using UUIDNext;
 
 namespace MachineService.State.Services;
@@ -53,28 +54,51 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     }
 
     /// <summary>
-    /// The record for storing active connections
+    /// The instance for storing active connections
     /// </summary>
-    /// <param name="ClientId">The client ID</param>
-    /// <param name="GatewayId">The gateway ID</param>
-    /// <param name="OrganizationId">The organization ID</param>
-    /// <param name="FirstSeenOn">The first seen timestamp</param>
-    /// <param name="LastUpdateOn">The last update timestamp</param>
-    /// <param name="MachineRegistrationId">The machine registration ID</param>
-    /// <param name="ClientVersion">The client version</param>
-    /// <param name="ClientIp">The client IP address</param>
-    /// <param name="ClientType">The client type</param>
-    public sealed record ActiveConnection(
-        string Id,
-        string? GatewayId,
-        string ClientId,
-        string OrganizationId,
-        DateTimeOffset FirstSeenOn,
-        DateTimeOffset LastUpdateOn,
-        string? MachineRegistrationId,
-        string? ClientVersion,
-        string? ClientIp,
-        ConnectionType ClientType);
+    public sealed class ActiveConnection
+    {
+        /// <summary>
+        /// The unique identifier for the active connection
+        /// </summary>
+        public required string Id { get; set; }
+        /// <summary>
+        /// The gateway ID
+        /// </summary>
+        public required string? GatewayId { get; set; }
+        /// <summary>
+        /// The client ID
+        /// </summary>
+        public required string ClientId { get; set; }
+        /// <summary>
+        /// The organization ID
+        /// </summary>
+        public required string OrganizationId { get; set; }
+        /// <summary>
+        /// The first seen timestamp
+        /// </summary>
+        public required DateTimeOffset FirstSeenOn { get; set; }
+        /// <summary>
+        /// The last update timestamp
+        /// </summary>
+        public required DateTimeOffset LastUpdateOn { get; set; }
+        /// <summary>
+        /// The machine registration ID
+        /// </summary>
+        public required string? MachineRegistrationId { get; set; }
+        /// <summary>
+        /// The client version
+        /// </summary>
+        public required string? ClientVersion { get; set; }
+        /// <summary>
+        /// The client IP address
+        /// </summary>
+        public required string? ClientIp { get; set; }
+        /// <summary>
+        /// The client type
+        /// </summary>
+        public required ConnectionType ClientType { get; set; }
+    }
 
 
     /// <summary>
@@ -131,55 +155,94 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     public async Task<bool> RegisterClient(ConnectionType clientType, Guid connectionId, string clientId, string organizationId,
         string? registeredAgentId, string? clientVersion, string? gatewayId, string? clientIp)
     {
-        using var session = store.LightweightSession();
-        var current = session.Query<ActiveConnection>()
-            .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+        using (var session = store.LightweightSession())
+        {
+            var current = session.Query<ActiveConnection>()
+                .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
 
-        session.Store(new ActiveConnection(
-            Id: current?.Id ?? Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
-            ClientId: clientId,
-            GatewayId: gatewayId,
-            OrganizationId: organizationId,
-            FirstSeenOn: current?.FirstSeenOn ?? DateTimeOffset.UtcNow,
-            LastUpdateOn: DateTimeOffset.UtcNow,
-            MachineRegistrationId: registeredAgentId,
-            ClientVersion: clientVersion,
-            ClientIp: clientIp,
-            ClientType: clientType
-        ));
+            if (current == null)
+            {
+                current = new ActiveConnection()
+                {
+                    Id = Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
+                    ClientId = clientId,
+                    GatewayId = gatewayId,
+                    OrganizationId = organizationId,
+                    FirstSeenOn = current?.FirstSeenOn ?? DateTimeOffset.UtcNow,
+                    LastUpdateOn = DateTimeOffset.UtcNow,
+                    MachineRegistrationId = registeredAgentId,
+                    ClientVersion = clientVersion,
+                    ClientIp = clientIp,
+                    ClientType = clientType
+                };
+            }
+            else
+            {
+                current.ClientId = clientId;
+                current.GatewayId = gatewayId;
+                current.OrganizationId = organizationId;
+                current.LastUpdateOn = DateTimeOffset.UtcNow;
+                current.MachineRegistrationId = registeredAgentId;
+                current.ClientVersion = clientVersion;
+                current.ClientIp = clientIp;
+                current.ClientType = clientType;
+            }
+
+            session.Store(current);
+            await session.SaveChangesAsync();
+        }
 
         if (!environmentConfig.DisableDatabaseClientHistory)
         {
-            session.Store(new ClientRegisterHistory(
-                RegisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
-                ClientId: clientId,
-                GatewayId: gatewayId,
-                Action: RegisterAction.Register,
-                OrganizationId: organizationId,
-                RegisteredOn: DateTimeOffset.UtcNow,
-                MachineRegistrationId: registeredAgentId,
-                ClientVersion: clientVersion,
-                ConnectionId: connectionId.ToString(),
-                ClientIp: clientIp,
-                ClientType: clientType));
-        }
+            try
+            {
 
-        await session.SaveChangesAsync();
+                using var historySession = store.LightweightSession();
+                historySession.Store(new ClientRegisterHistory(
+                    RegisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
+                    ClientId: clientId,
+                    GatewayId: gatewayId,
+                    Action: RegisterAction.Register,
+                    OrganizationId: organizationId,
+                    RegisteredOn: DateTimeOffset.UtcNow,
+                    MachineRegistrationId: registeredAgentId,
+                    ClientVersion: clientVersion,
+                    ConnectionId: connectionId.ToString(),
+                    ClientIp: clientIp,
+                    ClientType: clientType));
+                await historySession.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to log client registration history for client {ClientId} in organization {OrganizationId}", clientId, organizationId);
+            }
+        }
         return true;
     }
+
 
     /// <inheritdoc />
     public async Task<bool> UpdateClientActivity(string clientId, string organizationId)
     {
-        using var session = store.LightweightSession();
-        var current = session.Query<ActiveConnection>()
-            .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+        try
+        {
+            using var session = store.LightweightSession();
+            var current = session.Query<ActiveConnection>()
+                .FirstOrDefault(x => x.ClientId == clientId && x.OrganizationId == organizationId);
 
-        if (current == null)
+            if (current == null)
+                return false;
+
+            current.LastUpdateOn = DateTimeOffset.UtcNow;
+
+            session.Store(current);
+            await session.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to update client activity for client {ClientId} in organization {OrganizationId}", clientId, organizationId);
             return false;
-
-        session.Store(current with { LastUpdateOn = DateTimeOffset.UtcNow });
-        await session.SaveChangesAsync();
+        }
         return true;
     }
 
@@ -187,23 +250,41 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// <inheritdoc />
     public async Task<bool> DeRegisterClient(Guid connectionId, string clientId, string organizationId, long bytesReceived, long bytesSent)
     {
-        using var session = store.LightweightSession();
-        if (!string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(organizationId))
-            session.DeleteWhere<ActiveConnection>(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+        var result = true;
+        try
+        {
+            using var session = store.LightweightSession();
+            if (!string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(organizationId))
+                session.DeleteWhere<ActiveConnection>(x => x.ClientId == clientId && x.OrganizationId == organizationId);
+            await session.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to deregister client {ClientId} in organization {OrganizationId}", clientId, organizationId);
+            result = false;
+        }
 
         if (!environmentConfig.DisableDatabaseClientHistory)
         {
-            session.Store(new ClientUnregisterHistory(
-                UnregisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
-                ClientId: clientId,
-                UnregisterOn: DateTimeOffset.UtcNow,
-                BytesReceived: bytesReceived,
-                BytesSent: bytesSent,
-                ConnectionId: connectionId.ToString()));
+            try
+            {
+                using var historySession = store.LightweightSession();
+                historySession.Store(new ClientUnregisterHistory(
+                    UnregisterId: Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(),
+                    ClientId: clientId,
+                    UnregisterOn: DateTimeOffset.UtcNow,
+                    BytesReceived: bytesReceived,
+                    BytesSent: bytesSent,
+                    ConnectionId: connectionId.ToString()));
+                await historySession.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to log client unregistration history for client {ClientId} in organization {OrganizationId}", clientId, organizationId);
+            }
         }
 
-        await session.SaveChangesAsync();
-        return true;
+        return result;
     }
 
     /// <summary>
