@@ -100,7 +100,6 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
         public required ConnectionType ClientType { get; set; }
     }
 
-
     /// <summary>
     /// The record for storing client registration history
     /// </summary>
@@ -168,7 +167,7 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
                     ClientId = clientId,
                     GatewayId = gatewayId,
                     OrganizationId = organizationId,
-                    FirstSeenOn = current?.FirstSeenOn ?? DateTimeOffset.UtcNow,
+                    FirstSeenOn = DateTimeOffset.UtcNow,
                     LastUpdateOn = DateTimeOffset.UtcNow,
                     MachineRegistrationId = registeredAgentId,
                     ClientVersion = clientVersion,
