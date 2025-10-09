@@ -117,7 +117,7 @@ public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedC
         }
         else
         {
-            Log.Warning($"Non authenticated, will not relay.");
+            Log.Warning("Not authenticated, will not relay, connection state: {ConnectionState}, organization ID: {OrganizationId}.", state.ConnectionState, state.OrganizationId);
         }
     }
 }

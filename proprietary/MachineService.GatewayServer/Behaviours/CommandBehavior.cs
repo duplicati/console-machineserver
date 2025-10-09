@@ -81,7 +81,7 @@ public class CommandBehavior(
         }
         else
         {
-            Log.Warning($"Not authenticated, will not relay.");
+            Log.Warning("Not authenticated portal, will not relay, connection state: {ConnectionState}, organization ID: {OrganizationId}.", state.ConnectionState, state.OrganizationId);
         }
     }
 }

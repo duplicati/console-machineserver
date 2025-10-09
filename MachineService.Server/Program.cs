@@ -191,7 +191,7 @@ var logLevelSwitch = new LoggingLevelSwitch(defaultLogLevel);
 string? traceTarget = null;
 
 var serilogConfig = builder.Configuration.GetSection("Serilog").Get<SerilogConfig>();
-var extra = new LoggingExtras() { IsProd = envConfig.IsProd, MachineName = envConfig.MachineName };
+var extra = new LoggingExtras() { IsProd = envConfig.IsProd, MachineName = envConfig.MachineName, Hostname = envConfig.InstanceId };
 builder.AddCommonLogging(serilogConfig, extra, config =>
 {
     // Filter if a trace target has been set, use that target. Otherwise, log everything
