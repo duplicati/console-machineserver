@@ -93,6 +93,10 @@ if (string.IsNullOrWhiteSpace(envConfig.MachineName))
 if (string.IsNullOrWhiteSpace(envConfig.InstanceId))
     envConfig = envConfig with { InstanceId = $"{(envConfig.GatewayMode ? "gateway" : "service")}-{envConfig.MachineName}-{Guid.NewGuid()}" };
 
+// Non-production environment always if development mode is enabled
+if (builder.Environment.IsDevelopment())
+    envConfig = envConfig with { IsProd = false };
+
 if (string.IsNullOrWhiteSpace(envConfig.MachineServerPrivate) || envConfig.MachineServerKeyExpires == default)
 {
     if (!builder.Environment.IsDevelopment())
@@ -278,6 +282,8 @@ if (envConfig.IsUsingGatewayFeatures)
         license.EnsureFeatures(ConsoleLicenseFeatures.GatewayMachineServer);
         if (license.IsInGracePeriod)
             Log.Warning("The provided license is expired and in the grace period. It will stop working on {Expiration}", license.ValidToWithGrace);
+
+        Log.Information("Using gateway features as allowed by license until {Expiration}", license.ValidTo);
     }
 }
 
@@ -345,6 +351,7 @@ var statusReport = new Timer(_ =>
 {
     var connectionList = app.Services.GetRequiredService<ConnectionListService>().GetConnections();
     var serverStatistics = app.Services.GetRequiredService<ServerStatistics>();
+    var gatewayCount = app.Services.GetRequiredService<GatewayConnectionList>().Where(x => true).Count();
     var socketStates = connectionList.ToList();
 
     // We collect here instead of "on connection" because this is a non-critical statistic
@@ -360,10 +367,11 @@ var statusReport = new Timer(_ =>
             Server build: {GitCommit}
                   Uptime: {Uptime}
              Thread Pool: {BusyWorkerThreads} (Workers) & {BusyCompletionPortThreads} (Completion) of Max: {MaxWorkerThreads} & {MaxCompletionPortThreads}
-       Connected clients: {ConnectedClients}
-Record Connected clients: {MaxConnections} 
+       Connected Clients: {ConnectedClients}
+Record Connected Clients: {MaxConnections} 
        Total connections: {TotalConnections}
  Total Messages Received: {TotalMessagesReceived}
+     Gateway Connections: {GatewayConnections} of {GatewayServers}
                Log Level: {LogLevel}
                  Tracing: {TraceTarget}",
         envConfig.IsProd,
@@ -378,6 +386,8 @@ Record Connected clients: {MaxConnections}
         serverStatistics.MaxSimultaneousConnections,
         serverStatistics.TotalConnections,
         serverStatistics.TotalMessagesReceived,
+        gatewayCount,
+        (envConfig.GatewayServers ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Length,
         logLevelSwitch.MinimumLevel.ToString(),
         traceTarget ?? "No trace active");
 
