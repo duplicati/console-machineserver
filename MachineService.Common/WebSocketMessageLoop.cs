@@ -81,6 +81,10 @@ public class WebSocketMessageLoop(ServerStatistics serverStatistics,
                 Log.Warning(e, "Error while terminating websocket with policy violation for client {ClientId}", socketState.ClientId);
             }
         }
+        catch (Microsoft.AspNetCore.Connections.ConnectionAbortedException cae)
+        {
+            Log.Information(cae, "Connection aborted during shutdown for client {ClientId}", socketState.ClientId);
+        }
         catch (Exception e)
         {
             Log.Error(e, "Error in message loop for client {ClientId}", socketState.ClientId);
