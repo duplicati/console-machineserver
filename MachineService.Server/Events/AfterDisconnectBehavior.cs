@@ -64,7 +64,7 @@ public class AfterDisconnectBehavior(
             }
             catch (Exception e)
             {
-                Log.Error("Failed to register agent disconnected on state manager, investigate, non critical, agent registration will expire on database view", e);
+                Log.Error(e, "Failed to register agent disconnected on state manager, investigate, non critical, agent registration will expire automatically");
             }
 
             if (state.ConnectionState is ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated && !string.IsNullOrWhiteSpace(state.OrganizationId))
@@ -75,7 +75,7 @@ public class AfterDisconnectBehavior(
         }
         catch (Exception e)
         {
-            Log.Error("Failure during AfterDisconnectBehavior", e);
+            Log.Error(e, "Failure during AfterDisconnectBehavior");
         }
     }
 }

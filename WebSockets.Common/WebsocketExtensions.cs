@@ -73,7 +73,7 @@ public static class WebsocketExtensions
         }
         catch (System.Exception e)
         {
-            Log.Error("Error writing to websocket {message}", e.Message);
+            Log.Error(e, "Error writing to websocket {message}", e.Message);
             throw;
         }
         return message.Length;

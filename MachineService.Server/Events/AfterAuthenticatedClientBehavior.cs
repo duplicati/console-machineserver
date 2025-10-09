@@ -62,7 +62,7 @@ public class AfterAuthenticatedClientBehavior(
         }
         catch (Exception e)
         {
-            Log.Error("Failure during AfterAuthenticatedClientBehavior", e);
+            Log.Error(e, "Failure during AfterAuthenticatedClientBehavior");
         }
     }
 }
