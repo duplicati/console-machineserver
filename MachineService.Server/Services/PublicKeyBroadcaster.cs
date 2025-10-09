@@ -67,12 +67,10 @@ public class PublicKeyBroadcaster(EnvironmentConfig config, DerivedConfig derive
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             try
             {
-                using var timeoutTokenSource =
-                    new CancellationTokenSource(PublishTimeout);
-                using var linkedTokenSource =
-                    CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutTokenSource.Token);
+                linkedTokenSource.CancelAfter(PublishTimeout);
 
                 await publishService.PublishMessage(
                     derivedConfig.PublicKeyHash,
@@ -86,12 +84,17 @@ public class PublicKeyBroadcaster(EnvironmentConfig config, DerivedConfig derive
             catch (TaskCanceledException timeout)
             {
                 Log.Warning(timeout, "Timeout trying to publish public key on MassTransit");
-                Thread.Sleep(RetryTimeout);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error in public key background service");
             }
+            finally
+            {
+                linkedTokenSource.Cancel();
+            }
+
+            await Task.Delay(RetryTimeout, stoppingToken);
         }
     }
 }

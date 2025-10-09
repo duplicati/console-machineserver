@@ -8,14 +8,9 @@
 
     <ItemGroup>
         <PackageReference Include="IPNetwork2" Version="3.0.667" />
-        <PackageReference Include="JasperFx.CodeGeneration.Commands" Version="3.7.2" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.7" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
-        <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
-        <PackageReference Include="KVPSButter.S3" Version="0.0.11-alpha" />
-        <PackageReference Include="KVPSButter.Postgres" Version="0.0.1-alpha" />
-        <PackageReference Include="SimpleSecurityFilter" Version="1.0.2" />
-        <PackageReference Include="CommonDuplicatiConsoleLogging" Version="1.0.2" />      
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+        <PackageReference Include="DuplicatiConsoleCommon" Version="1.0.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -24,6 +19,8 @@
         <ProjectReference Include="..\MachineService.State\MachineService.State.csproj" />
         <ProjectReference Include="..\MachineService.Common\MachineService.Common.csproj" />
         <ProjectReference Include="..\WebSockets.Common\WebSockets.Common.csproj" />
+        <ProjectReference Include="..\proprietary\MachineService.GatewayClient\MachineService.GatewayClient.csproj" />
+        <ProjectReference Include="..\proprietary\MachineService.GatewayServer\MachineService.GatewayServer.csproj" />
     </ItemGroup>
 
 </Project>

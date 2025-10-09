@@ -41,7 +41,13 @@ public record SocketState : IDisposable
     /// <summary>
     /// Indicates whether the client has been authenticated.
     /// </summary>
-    public bool Authenticated { get; set; }
+    public bool Authenticated => ConnectionState switch
+    {
+        ConnectionState.ConnectedAgentAuthenticated or
+        ConnectionState.ConnectedPortalAuthenticated or
+        ConnectionState.ConnectedGatewayAuthenticated => true,
+        _ => false
+    };
 
     /// <summary>
     /// Indicates whether the handshake process is complete. True when ClientPublicKey is set.
@@ -106,7 +112,19 @@ public record SocketState : IDisposable
     /// <summary>
     /// Represents the type of connection, if its Agent, Portal (and in future gateway)
     /// </summary>
-    public ConnectionType Type { get; set; }
+    public ConnectionType Type => ConnectionState switch
+    {
+        ConnectionState.ConnectedAgentAuthenticated or
+        ConnectionState.ConnectedAgentUnauthenticated => ConnectionType.Agent,
+
+        ConnectionState.ConnectedPortalAuthenticated or
+        ConnectionState.ConnectedPortalUnauthenticated => ConnectionType.Portal,
+
+        ConnectionState.ConnectedGatewayAuthenticated or
+        ConnectionState.ConnectedGatewayUnauthenticated => ConnectionType.Gateway,
+
+        _ => ConnectionType.Unknown
+    };
 
     /// <summary>
     /// Statistics - Total bytes received from this connection
@@ -116,6 +134,26 @@ public record SocketState : IDisposable
     /// Statistics - Total bytes sent to this connection
     /// </summary>
     public long BytesSent;
+
+    /// <summary>
+    /// The nonce bytes used during the gateway handshake process.
+    /// </summary>
+    public byte[]? NonceBytes { get; set; }
+
+    /// <summary>
+    /// The authentication hash for the gateway, if applicable.
+    /// </summary>
+    public string? GatewayAuthHash { get; set; }
+
+    /// <summary>
+    /// Semaphore to ensure that only one write operation occurs at a time on the WebSocket.
+    /// </summary>
+    private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
+
+    /// <summary>
+    /// Tracking of recently forwarded proxy messages
+    /// </summary>
+    private readonly RecentActivityMap _recentMessages = new RecentActivityMap();
 
     /// <summary>
     /// Represents the current state of the connection, if its connected, authenticated, etc.
@@ -128,9 +166,9 @@ public record SocketState : IDisposable
     /// Increment the bytes received statistics. If the counter is at the maximum value, it will reset to 0 to avoid overflow.
     /// </summary>
     /// <param name="bytesReceived">Bytes to increment the counter by</param>
-    public void IncrementBytesReceived(Int64 bytesReceived)
+    public void IncrementBytesReceived(long bytesReceived)
     {
-        if (BytesReceived == Int64.MaxValue)
+        if (BytesReceived == long.MaxValue)
             BytesReceived = 0;
 
         Interlocked.Add(ref BytesReceived, bytesReceived);
@@ -140,9 +178,9 @@ public record SocketState : IDisposable
     /// Increment the bytes sent statistics. If the counter is at the maximum value, it will reset to 0 to avoid overflow.
     /// </summary>
     /// <param name="bytesSent">Bytes to increment the counter by</param>
-    private void IncrementBytesSent(Int64 bytesSent)
+    private void IncrementBytesSent(long bytesSent)
     {
-        if (BytesSent == Int64.MaxValue)
+        if (BytesSent == long.MaxValue)
             BytesSent = 0;
 
         Interlocked.Add(ref BytesSent, bytesSent);
@@ -169,36 +207,44 @@ public record SocketState : IDisposable
     /// <param name="message">The message envelope</param>
     /// <param name="derivedConfig">Encryption keys reference</param>
     /// <returns>The number of bytes sent</returns>
-    public Task<int> WriteMessage(EnvelopedMessage message, DerivedConfig derivedConfig)
+    public async Task<int> WriteMessage(EnvelopedMessage message, DerivedConfig derivedConfig)
     {
-        // Update the last sent time statistics
-        LastSent = DateTimeOffset.Now;
+        try
+        {
+            await _writeLock.WaitAsync();
+            // Update the last sent time statistics
+            LastSent = DateTimeOffset.Now;
 
-        int bytesSent;
+            int bytesSent;
 
-        if (new List<ConnectionState>
+            switch (ConnectionState)
             {
-                ConnectionState.ConnectedAgentUnauthenticated,
-                ConnectionState.ConnectedPortalUnauthenticated,
-                ConnectionState.ConnectedPortalAuthenticated
-            }.Contains(ConnectionState))
-        {
-            bytesSent = WebSocket.WriteMessage(message,
-                WrappingType.PlainText, derivedConfig.PrivateKey).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-        else
-        {
-            bytesSent = WebSocket.WriteMessage(
-                message,
-                HandshakeComplete ? WrappingType.Encrypt : WrappingType.SignOnly,
-                HandshakeComplete ? ClientPublicKey : derivedConfig.PrivateKey
-            ).ConfigureAwait(false).GetAwaiter().GetResult(); ;
-        }
+                case ConnectionState.ConnectedAgentUnauthenticated:
+                case ConnectionState.ConnectedPortalUnauthenticated:
+                case ConnectionState.ConnectedPortalAuthenticated:
+                case ConnectionState.ConnectedGatewayUnauthenticated:
+                case ConnectionState.ConnectedGatewayAuthenticated:
+                    bytesSent = await WebSocket.WriteMessage(message, WrappingType.PlainText).ConfigureAwait(false);
+                    break;
 
-        // Increment bytes sent statistics
-        IncrementBytesSent(bytesSent);
+                default:
+                    bytesSent = await WebSocket.WriteMessage(
+                        message,
+                        HandshakeComplete ? WrappingType.Encrypt : WrappingType.SignOnly,
+                        HandshakeComplete ? ClientPublicKey : derivedConfig.PrivateKey
+                    ).ConfigureAwait(false);
+                    break;
+            }
 
-        return Task.FromResult(bytesSent);
+            // Increment bytes sent statistics
+            IncrementBytesSent(bytesSent);
+            return bytesSent;
+        }
+        finally
+        {
+            // Release the write lock
+            _writeLock.Release();
+        }
     }
 
     /// <summary>
@@ -210,13 +256,39 @@ public record SocketState : IDisposable
     /// <returns>The number of bytes sent</returns>
     public async Task<int> WriteMessage(EnvelopedMessage envelopedMessage, WrappingType wrappingType, RSA? key = null)
     {
-        LastSent = DateTimeOffset.Now;
+        try
+        {
+            await _writeLock.WaitAsync();
 
-        var bytesSent = await WebSocket.WriteString(envelopedMessage.ToTransportFormat(wrappingType, key));
+            LastSent = DateTimeOffset.Now;
+            var bytesSent = await WebSocket.WriteMessage(envelopedMessage, wrappingType, key);
 
-        // Increment bytes sent statistics
-        IncrementBytesSent(bytesSent);
+            // Increment bytes sent statistics
+            IncrementBytesSent(bytesSent);
 
-        return bytesSent;
+            return bytesSent;
+        }
+        finally
+        {
+            // Release the write lock
+            _writeLock.Release();
+        }
     }
+
+    /// <summary>
+    /// Check if this socket is interested in messages for the given organization and client ID.
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="clientId">The client ID</param>
+    /// <returns><c>true</c> if interested, otherwise <c>false</c></returns>
+    public bool IsInterestedIn(string organizationId, string clientId)
+        => _recentMessages.Contains(organizationId, clientId);
+
+    /// <summary>
+    /// Mark this socket as interested in messages for the given organization and client ID.
+    /// </summary>
+    /// <param name="organizationId">The organization ID</param>
+    /// <param name="clientId">The client ID</param>
+    public void MarkAsInterestedIn(string organizationId, string clientId)
+        => _recentMessages.AddOrUpdate(organizationId, clientId);
 }

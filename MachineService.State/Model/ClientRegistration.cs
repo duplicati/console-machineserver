@@ -43,9 +43,9 @@ public record ClientRegistration
     /// </summary>
     public required string? MachineRegistrationId { get; init; }
     /// <summary>
-    /// The machine server URI the client is connected to
+    /// The ID of the gateway the client is connected to
     /// </summary>
-    public required string MachineServerUri { get; init; }
+    public required string GatewayId { get; init; }
     /// <summary>
     /// The connection type
     /// </summary>

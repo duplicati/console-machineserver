@@ -20,9 +20,14 @@
 using System.Text.Json.Serialization.Metadata;
 using JasperFx.CodeGeneration;
 using JasperFx.CodeGeneration.Commands;
+using MachineService.State.Services;
 using Marten;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Oakton;
 using Weasel.Core;
+
+namespace MachineService.State;
 
 /// <summary>
 /// Extension methods for setting up Marten in the service collection

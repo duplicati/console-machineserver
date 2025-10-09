@@ -38,15 +38,16 @@ public class PendingAgentControlService : IPendingAgentControlService
     /// <summary>
     /// Get the key for a message
     /// </summary>
-    /// <param name="messageId">The message ID</param>
+    /// <param name="organizationId">The organization ID</param>
     /// <param name="clientId">The client ID</param>
+    /// <param name="messageId">The message ID</param>
     /// <returns>The key for the message</returns>
-    private static string GetKey(string messageId, string clientId) => $"{clientId}:{messageId}";
+    private static string GetKey(string organizationId, string clientId, string messageId) => $"{organizationId}:{clientId}:{messageId}";
 
     /// <inheritdoc/>
-    public Task<ControlResponseMessage> PrepareForControlResponse(string messageId, string clientId, CancellationToken ct)
+    public Task<ControlResponseMessage> PrepareForControlResponse(string organizationId, string clientId, string messageId, CancellationToken ct)
     {
-        var key = GetKey(messageId, clientId);
+        var key = GetKey(organizationId, clientId, messageId);
         var tcs = new TaskCompletionSource<ControlResponseMessage>();
         ct.Register(() =>
         {
@@ -61,9 +62,9 @@ public class PendingAgentControlService : IPendingAgentControlService
     }
 
     /// <inheritdoc/>
-    public void SetControlResponse(string messageId, string clientId, ControlResponseMessage response)
+    public void SetControlResponse(string organizationId, string clientId, string messageId, ControlResponseMessage response)
     {
-        var key = GetKey(messageId, clientId);
+        var key = GetKey(organizationId, clientId, messageId);
         lock (_lock)
         {
             if (_pendingResponses.TryGetValue(key, out var tcs))

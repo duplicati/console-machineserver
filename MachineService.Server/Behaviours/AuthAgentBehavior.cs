@@ -22,7 +22,6 @@ using MachineService.Common;
 using MachineService.Common.Enums;
 using MachineService.Common.Exceptions;
 using MachineService.Common.Services;
-using MachineService.Server.Utility;
 using MachineService.State.Interfaces;
 
 namespace MachineService.Server.Behaviours;
@@ -36,7 +35,7 @@ namespace MachineService.Server.Behaviours;
 /// <param name="onAuthenticatedClientBehavior">Optional behavior to execute after successful authentication</param>
 /// <param name="statisticsGatherer">The statistics gatherer service</param>
 /// <param name="stateManagerService">The state manager service</param>
-public class AuthBehavior(
+public class AuthAgentBehavior(
     EnvironmentConfig envConfig,
     DerivedConfig derivedConfig,
     IBackendRelayConnection backendRelayConnection,
@@ -96,26 +95,24 @@ public class AuthBehavior(
             state.ProtocolVersion = authRequest.ProtocolVersion;
             state.ClientPublicKey = clientKey;
             state.ClientVersion = authRequest.ClientVersion;
-            state.Authenticated = authResult.Success;
             state.OrganizationId = authResult.OrganizationId;
             state.TokenExpiration = authResult.TokenExpiration;
             state.RegisteredAgentId = authResult.RegisteredAgentId;
-            state.Type = ConnectionType.Agent;
             state.ClientId = message.From!;
             state.ConnectionState = ConnectionState.ConnectedAgentAuthenticated;
 
             await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId, state.OrganizationId!,
-                state.RegisteredAgentId, state.ClientVersion, ServerUrlBuilder.BuildUrl(), state.RemoteIpAddress);
+                state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress);
 
             response = new EnvelopedMessage
             {
                 Type = MessageTypes.Auth.ToString().ToLowerInvariant(),
-                From = envConfig.MachineName,
+                From = envConfig.InstanceId,
                 MessageId = message.MessageId,
                 To = message.From,
                 Payload = EnvelopedMessage.SerializePayload(new AuthResultMessage(
                         Accepted: true,
-                        WillReplaceToken: !String.IsNullOrEmpty(authResult.NewToken),
+                        WillReplaceToken: !string.IsNullOrWhiteSpace(authResult.NewToken),
                         authResult.NewToken
                 ))
             };
@@ -136,7 +133,7 @@ public class AuthBehavior(
             response = new EnvelopedMessage
             {
                 Type = MessageTypes.Auth.ToString().ToLowerInvariant(),
-                From = envConfig.MachineName,
+                From = envConfig.InstanceId,
                 MessageId = message.MessageId,
                 To = message.From,
                 Payload = EnvelopedMessage.SerializePayload(new AuthResultMessage(

@@ -19,6 +19,7 @@
 // SOFTWARE.
 using MachineService.Common.Services;
 using MachineService.External;
+using MachineService.Server.Utility;
 using MachineService.State.Interfaces;
 
 namespace MachineService.Server.Events;
@@ -29,12 +30,14 @@ namespace MachineService.Server.Events;
 /// <param name="envConfig">DI Injected settings</param>
 /// <param name="listBehavior">DI Injected behavior to process the virtual list commands</param>
 /// <param name="connectionListService">DI injected to access all connections to machineserver</param>
+/// <param name="gatewayConnectionList">DI injected to access all gateway connections to machineserver</param>
 /// <param name="publishAgentActivityService">DI injected to publish agent activity events</param>
 /// <param name="stateManagerService">DI injected to manage the state of connected clients</
 public class AfterDisconnectBehavior(
     EnvironmentConfig envConfig,
     ListBehavior listBehavior,
     ConnectionListService connectionListService,
+    GatewayConnectionList gatewayConnectionList,
     IPublishAgentActivityService publishAgentActivityService,
     IStateManagerService stateManagerService) : IAfterDisconnectBehavior
 {
@@ -64,33 +67,10 @@ public class AfterDisconnectBehavior(
                 Log.Error("Failed to register agent disconnected on state manager, investigate, non critical, agent registration will expire on database view", e);
             }
 
-            // Proactively send the list of connected clients to all existing and authenticated
-            // portal connections
-            var listSnapshot = connectionListService.GetConnections();
-
-            foreach (var portalConnection in listSnapshot.Where(x =>
-                         x.OrganizationId == state.OrganizationId &&
-                         x.ConnectionState == ConnectionState.ConnectedPortalAuthenticated))
+            if (state.ConnectionState is ConnectionState.ConnectedAgentAuthenticated or ConnectionState.ConnectedPortalAuthenticated && !string.IsNullOrWhiteSpace(state.OrganizationId))
             {
-
-                Log.Debug("Propagating list to portal {PortalClientId} reactively after an agent disconnected", portalConnection.ClientId);
-
-                // Send the list of connected clients to the authenticated portal, we do that
-                // by emulating a list command, so we have can use the built-in ListBehavior
-                try
-                {
-                    await listBehavior.ExecuteAsync(portalConnection, new EnvelopedMessage
-                    {
-                        From = envConfig.MachineName,
-                        To = portalConnection.ClientId,
-                        Type = MessageTypes.List.ToString().ToLowerInvariant(),
-                        MessageId = Guid.NewGuid().ToString()
-                    });
-                }
-                catch (Exception e)
-                {
-                    Log.Debug("Failed sending List to Portal connection, non critical {e}", e);
-                }
+                await ForwardListUpdateMessages.ForwardListUpdateToConnectedClients(connectionListService, listBehavior, envConfig.InstanceId!, state.OrganizationId);
+                await ForwardListUpdateMessages.ForwardListUpdateToRelevantGateways(gatewayConnectionList, stateManagerService, envConfig.InstanceId!, state.OrganizationId);
             }
         }
         catch (Exception e)

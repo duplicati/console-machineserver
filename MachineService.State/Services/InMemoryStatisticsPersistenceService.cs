@@ -28,8 +28,9 @@ public class InMemoryStatisticsPersistenceService : IStatisticsPersistenceServic
 {
     /// <inheritdoc/>
     public Task PersistStatistics(Dictionary<string, ulong> statistics)
-    {
-        // No-op for in-memory implementation
-        return Task.CompletedTask;
-    }
+        => Task.CompletedTask; // No-op for in-memory implementation
+
+    /// <inheritdoc/>
+    public Task PurgeStaleData()
+        => Task.CompletedTask; // No-op for in-memory implementation
 }

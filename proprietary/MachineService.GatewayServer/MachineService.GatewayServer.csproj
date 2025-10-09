@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MachineService.GatewayServer</AssemblyName>
+    <RootNamespace>MachineService.GatewayServer</RootNamespace>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.7" />
+    <PackageReference Include="SimpleSecurityFilter" Version="1.0.2" />
+    <PackageReference Include="CommonDuplicatiConsoleLogging" Version="1.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\MachineService.State\MachineService.State.csproj" />
+    <ProjectReference Include="..\..\MachineService.Common\MachineService.Common.csproj" />
+  </ItemGroup>
+
+</Project>

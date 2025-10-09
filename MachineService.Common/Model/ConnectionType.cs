@@ -25,11 +25,19 @@ namespace MachineService.Common.Model;
 public enum ConnectionType
 {
     /// <summary>
+    /// Unknown connection type
+    /// </summary>
+    Unknown = 0,
+    /// <summary>
     /// Agent connection
     /// </summary>
     Agent = 1,
     /// <summary>
     /// Portal connection
     /// </summary>
-    Portal = 2
+    Portal = 2,
+    /// <summary>
+    /// Gateway connection
+    /// </summary>
+    Gateway = 3,
 }

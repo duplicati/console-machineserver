@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 using System.Net.WebSockets;
+using MachineService.Common.Exceptions;
 using Serilog;
 using WebSockets.Common;
 
@@ -36,41 +37,78 @@ public static class SocketStateExtensions
     /// <param name="socketState">The socket state</param>
     /// <param name="messageDelegate">The delegate to invoke for each message</param>
     /// <param name="bufferSize">The buffer size for receiving messages</param>
+    /// <param name="maxBytesInitialMessage">The maximum allowed size for the initial message</param>
+    /// <param name="maxBytes">The maximum allowed size for subsequent messages</param>
     /// <param name="cancellationToken">A cancellation token to stop receiving</param>
     /// <returns>A task representing the asynchronous operation</returns>
     public static async Task ReceiveMessages(this SocketState socketState,
         Func<WebSocketReceiveResult, byte[], Task> messageDelegate, int bufferSize,
-        CancellationToken cancellationToken = default)
+        int maxBytesInitialMessage, int maxBytes, CancellationToken cancellationToken)
     {
-        var readBuffer = new byte[bufferSize];
+        var currentMax = maxBytesInitialMessage;
+        var started = DateTimeOffset.Now;
         try
         {
-            while (socketState.WebSocket.State == WebSocketState.Open &&
-                   cancellationToken.IsCancellationRequested == false)
+            while (socketState.WebSocket.State == WebSocketState.Open && cancellationToken.IsCancellationRequested == false)
             {
-                var fullResult = new List<byte>();
-                WebSocketReceiveResult result;
-                do
-                {
-                    result = await socketState.WebSocket.ReceiveAsync(new ArraySegment<byte>(readBuffer),
-                        CancellationToken.None);
-                    fullResult.AddRange(readBuffer.Take(result.Count));
-                } while (!result.EndOfMessage);
-
+                var (result, data) = await socketState.WebSocket.ReceiveMessage(bufferSize, currentMax, cancellationToken);
                 socketState.LastReceived = DateTimeOffset.Now;
-                socketState.IncrementBytesReceived(fullResult.Count);
+                socketState.IncrementBytesReceived(data.Length);
 
-                await messageDelegate(result, fullResult.ToArray());
+                await messageDelegate(result, data.ToArray());
+                currentMax = maxBytes; // After the initial message, allow larger messages
             }
+
+            Log.Debug("WebSocket connection closed, duration: {Duration}, status: {CloseStatus} - {CloseStatusDescription}", DateTimeOffset.Now - started, socketState.WebSocket.CloseStatus, socketState.WebSocket.CloseStatusDescription);
         }
-        catch (WebSocketException)
+        catch (WebSocketException) when (socketState.WebSocket.State == WebSocketState.Aborted || socketState.WebSocket.State == WebSocketState.Closed)
         {
             // This is expected when the client simply disconnects, nothing to be done on our side
             // as cleanup of the object is implicit when it disposes itself.
+            Log.Debug("WebSocket connection closed, duration: {Duration}, status: {CloseStatus} - {CloseStatusDescription}", DateTimeOffset.Now - started, socketState.WebSocket.CloseStatus, socketState.WebSocket.CloseStatusDescription);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected when the cancellation token is triggered, nothing to be done
+            Log.Debug("WebSocket connection close requested, duration: {Duration}, status: {CloseStatus} - {CloseStatusDescription}", DateTimeOffset.Now - started, socketState.WebSocket.CloseStatus, socketState.WebSocket.CloseStatusDescription);
         }
         catch (Exception e)
         {
             Log.Error(e, "Error during receiving process.");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Receives a complete message from the WebSocket, handling fragmentation and size limits.
+    /// </summary>
+    /// <param name="webSocket">The WebSocket instance</param>
+    /// <param name="bufferSize">The buffer size for receiving messages</param>
+    /// <param name="maxBytes">The maximum allowed size for the message</param>
+    /// <param name="cancellationToken">A cancellation token to stop receiving</param>
+    /// <returns>A task representing the asynchronous operation</returns>
+    public static async Task<(WebSocketReceiveResult, MemoryStream)> ReceiveMessage(this WebSocket webSocket, int bufferSize, int maxBytes, CancellationToken cancellationToken)
+    {
+        var readBuffer = new byte[bufferSize];
+        var ms = new MemoryStream();
+
+        try
+        {
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(readBuffer), cancellationToken);
+                ms.Write(readBuffer, 0, result.Count);
+                if (ms.Length > maxBytes)
+                    throw new PolicyViolationException(ErrorMessages.TooMuchDataWithoutAuthentication);
+            } while (!result.EndOfMessage);
+
+            ms.Position = 0;
+            return (result, ms);
+        }
+        catch
+        {
+            ms.Dispose();
             throw;
         }
     }

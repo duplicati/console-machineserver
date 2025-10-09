@@ -9,4 +9,6 @@
   <Project Path="MachineService.State/MachineService.State.csproj" />
   <Project Path="MachineService.State.UnitTests/MachineService.State.UnitTests.csproj" />
   <Project Path="WebSockets.Common/WebSockets.Common.csproj" />
+  <Project Path="proprietary/MachineService.GatewayServer/MachineService.GatewayServer.csproj" />
+  <Project Path="proprietary/MachineService.GatewayClient/MachineService.GatewayClient.csproj" />
 </Solution>

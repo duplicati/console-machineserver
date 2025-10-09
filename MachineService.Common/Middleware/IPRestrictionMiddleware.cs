@@ -18,8 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 using KVPSButter;
+using MachineService.Common.Util;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-namespace MachineService.Server.Middleware;
+namespace MachineService.Common.Middleware;
 
 /// <summary>
 /// Middleware that restricts access based on IP rules stored in a PostgreSQL database.

@@ -54,16 +54,16 @@ public class ListBehavior(
             if (state.ConnectionState != ConnectionState.ConnectedPortalAuthenticated)
                 throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForList);
 
-            var clientsForOrganization = await stateManagerService.GetClients(state.OrganizationId);
-            Log.Debug("Returning {Count} clients for organization {OrganizationId}", clientsForOrganization.Count, state.OrganizationId);
+            var agentsForOrganization = await stateManagerService.GetAgents(state.OrganizationId);
+            Log.Debug("Returning {Count} clients for organization {OrganizationId}", agentsForOrganization.Count, state.OrganizationId);
 
             await state.WriteMessage(new EnvelopedMessage
             {
                 Type = message.Type,
-                From = envConfig.MachineName,
+                From = envConfig.InstanceId,
                 MessageId = message.MessageId,
                 To = message.From,
-                Payload = EnvelopedMessage.SerializePayload(clientsForOrganization)
+                Payload = EnvelopedMessage.SerializePayload(agentsForOrganization)
             }, derivedConfig);
 
             statisticsGatherer.Increment(StatisticsType.ListCommandSuccess);

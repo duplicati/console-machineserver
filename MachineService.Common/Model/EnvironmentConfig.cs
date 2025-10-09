@@ -28,10 +28,16 @@ namespace MachineService.Common.Model;
 /// <param name="IsProd">Whether the environment is production</param>
 /// <param name="VerifySchema">Whether to verify the database schema on startup</param>
 /// <param name="MachineServerPrivate">The private key of the machine server</param>
+/// <param name="RedirectUrl">The URL to redirect to, if requesting the root path</param>
+/// <param name="InstanceId">The unique instance name, if running multiple instances</param>
 /// <param name="MachineServerKeyExpires">The expiration date of the public key of the machine server</param>
 /// <param name="Git_Commit_Version">The git commit version</param>
+/// <param name="GatewayPreSharedKey">The gateway pre-shared key</param>
+/// <param name="LicenseKey">The license key for enabling proprietary features</param>
 /// <param name="PreCompiledDbClasses">Whether the database classes are pre-compiled</param>
 /// <param name="MaxBytesBeforeAuthentication">The maximum bytes before authentication</param>
+/// <param name="MaxMessageSize">The maximum websocket message size</param>
+/// <param name="StatisticsRetentionDays">The number of days to retain statistics</param>
 /// <param name="WebsocketReceiveBufferSize">The websocket receive buffer size</param>
 /// <param name="SecondsBetweenStatistics">Seconds between gathering statistics</param>
 /// <param name="StatusReportIntervalSeconds">Interval in seconds between status reports to the backend</param>
@@ -40,23 +46,34 @@ namespace MachineService.Common.Model;
 /// <param name="InMemoryClientList">Whether to use an in-memory client list instead of a database</param>
 /// <param name="DisablePingMessages">Whether to disable ping activity messages sent on MassTransit</param>
 /// <param name="DisableDatabaseStatistics">Whether to disable database statistics gathering</param>
+/// <param name="GatewayMode">Whether the server is running in gateway mode</param>
+/// <param name="GatewayServers">A comma-separated list of gateway servers to connect to</param>
+/// <param name="EnableTraceDebugging">Whether to enable trace debugging</param>
 public record EnvironmentConfig(
     string? MachineName,
     bool IsProd,
     bool? VerifySchema = null,
     string? MachineServerPrivate = null,
     string? RedirectUrl = null,
+    string? InstanceId = null,
     DateTimeOffset? MachineServerKeyExpires = null,
     string? Git_Commit_Version = null,
+    string? GatewayPreSharedKey = null,
+    string? LicenseKey = null,
     bool? PreCompiledDbClasses = false,
     int MaxBytesBeforeAuthentication = 100000,
+    int MaxMessageSize = 1024 * 1024,
+    int StatisticsRetentionDays = 30,
     int WebsocketReceiveBufferSize = 4096,
     int SecondsBetweenStatistics = 300,
     int StatusReportIntervalSeconds = 30,
     bool DisableDatabaseClientHistory = false,
     bool InMemoryClientList = false,
     bool DisablePingMessages = false,
-    bool DisableDatabaseStatistics = false
+    bool DisableDatabaseStatistics = false,
+    bool GatewayMode = false,
+    string GatewayServers = "",
+    bool EnableTraceDebugging = false
 )
 {
     /// <summary>
@@ -70,4 +87,9 @@ public record EnvironmentConfig(
     /// Flag indicating whether a database is required
     /// </summary>
     public bool RequiresDatabase => !InMemoryClientList || !DisableDatabaseStatistics;
+
+    /// <summary>
+    /// Flag indicating whether gateway features are enabled
+    /// </summary>
+    public bool IsUsingGatewayFeatures => GatewayMode || !string.IsNullOrWhiteSpace(GatewayServers);
 }

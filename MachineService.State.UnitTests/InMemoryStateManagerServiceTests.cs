@@ -44,17 +44,17 @@ public class InMemoryStateManagerServiceTests
     public async Task RegisterClient_ExistingClient_UpdatesRegistration()
     {
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri1", "ip1");
-        var initialClients = await _service.GetClients("org1");
+        var initialClients = await _service.GetAgents("org1");
         var initialLastUpdated = initialClients.First().LastUpdatedOn;
 
         await Task.Delay(10); // Ensure time difference
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent2", "2.0", "uri2", "ip2");
 
-        var updatedClients = await _service.GetClients("org1");
+        var updatedClients = await _service.GetAgents("org1");
         Assert.That(updatedClients.Count, Is.EqualTo(1));
         Assert.That(updatedClients.First().MachineRegistrationId, Is.EqualTo("agent2"));
         Assert.That(updatedClients.First().ClientVersion, Is.EqualTo("2.0"));
-        Assert.That(updatedClients.First().MachineServerUri, Is.EqualTo("uri2"));
+        Assert.That(updatedClients.First().GatewayId, Is.EqualTo("uri2"));
         Assert.That(updatedClients.First().LastUpdatedOn, Is.GreaterThan(initialLastUpdated));
     }
 
@@ -62,14 +62,14 @@ public class InMemoryStateManagerServiceTests
     public async Task UpdateClientActivity_ExistingClient_ReturnsTrueAndUpdatesTimestamp()
     {
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri", "ip");
-        var initialClients = await _service.GetClients("org1");
+        var initialClients = await _service.GetAgents("org1");
         var initialLastUpdated = initialClients.First().LastUpdatedOn;
 
         await Task.Delay(10);
         var result = await _service.UpdateClientActivity("client1", "org1");
 
         Assert.That(result, Is.True);
-        var updatedClients = await _service.GetClients("org1");
+        var updatedClients = await _service.GetAgents("org1");
         Assert.That(updatedClients.First().LastUpdatedOn, Is.GreaterThan(initialLastUpdated));
     }
 
@@ -85,13 +85,13 @@ public class InMemoryStateManagerServiceTests
     public async Task DeRegisterClient_ExistingClient_RemovesClient()
     {
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri", "ip");
-        var initialClients = await _service.GetClients("org1");
+        var initialClients = await _service.GetAgents("org1");
         Assert.That(initialClients.Count, Is.EqualTo(1));
 
         var result = await _service.DeRegisterClient(Guid.NewGuid(), "client1", "org1", 0, 0);
 
         Assert.That(result, Is.True);
-        var remainingClients = await _service.GetClients("org1");
+        var remainingClients = await _service.GetAgents("org1");
         Assert.That(remainingClients.Count, Is.EqualTo(0));
     }
 
@@ -106,7 +106,7 @@ public class InMemoryStateManagerServiceTests
     [Test]
     public async Task GetClients_NoClients_ReturnsEmptyList()
     {
-        var clients = await _service.GetClients("org1");
+        var clients = await _service.GetAgents("org1");
 
         Assert.That(clients, Is.Empty);
     }
@@ -117,7 +117,7 @@ public class InMemoryStateManagerServiceTests
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri", "ip");
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "portal-client1", "org1", "agent2", "1.0", "uri", "ip");
 
-        var clients = await _service.GetClients("org1");
+        var clients = await _service.GetAgents("org1");
 
         Assert.That(clients.Count, Is.EqualTo(1));
         Assert.That(clients.First().ClientId, Is.EqualTo("client1"));
@@ -129,8 +129,8 @@ public class InMemoryStateManagerServiceTests
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client1", "org1", "agent1", "1.0", "uri", "ip");
         await _service.RegisterClient(ConnectionType.Agent, Guid.NewGuid(), "client2", "org2", "agent2", "1.0", "uri", "ip");
 
-        var org1Clients = await _service.GetClients("org1");
-        var org2Clients = await _service.GetClients("org2");
+        var org1Clients = await _service.GetAgents("org1");
+        var org2Clients = await _service.GetAgents("org2");
 
         Assert.That(org1Clients.Count, Is.EqualTo(1));
         Assert.That(org1Clients.First().ClientId, Is.EqualTo("client1"));
@@ -161,7 +161,7 @@ public class InMemoryStateManagerServiceTests
 
         await Task.WhenAll(tasks);
 
-        var finalClients = await _service.GetClients("org1");
+        var finalClients = await _service.GetAgents("org1");
         Assert.That(finalClients, Is.Empty);
     }
 }

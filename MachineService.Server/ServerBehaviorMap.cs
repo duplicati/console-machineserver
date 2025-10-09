@@ -17,33 +17,23 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-using System.Net;
-
-namespace MachineService.Server.Utility;
+namespace MachineService.Server;
 
 /// <summary>
-/// Utility to build the server URL to be used by gateway to reach the clients.
+/// Mapping of command strings to their corresponding behavior types for the machine server.
 /// </summary>
-public static class ServerUrlBuilder
+public static class ServerBehaviorMap
 {
-#if DEBUG
-    private static bool _useWss = false;
-#else
-    private static bool _useWss = true;
-#endif
-
-    public static string BuildUrl()
+    /// <summary>
+    /// Dictionary mapping command strings to behavior types.
+    /// </summary>
+    public static Dictionary<string, Type> Behaviors => new Dictionary<string, Type>
     {
-        var ipAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList
-            .FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
-                                  && !ip.ToString().Equals("127.0.0.1")
-                                  && !ip.ToString().Equals("0.0.0.0"))
-            ?.ToString();
-        if (ipAddress == null)
-        {
-            Log.Warning($"Could not determine IP address for server URL, will return {Dns.GetHostName()}");
-            ipAddress = Dns.GetHostName();
-        }
-        return _useWss ? $"wss://{ipAddress}/gateway" : $"ws://{ipAddress}/gateway";
-    }
+        {PingBehavior.Command, typeof(PingBehavior)},
+        {AuthPortalBehavior.Command, typeof(AuthPortalBehavior)},
+        {AuthAgentBehavior.Command, typeof(AuthAgentBehavior)},
+        {CommandBehavior.Command, typeof(CommandBehavior)},
+        {ControlBehavior.Command, typeof(ControlBehavior)},
+        {ListBehavior.Command, typeof(ListBehavior)}
+    };
 }
