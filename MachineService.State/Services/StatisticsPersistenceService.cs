@@ -77,8 +77,9 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
     {
         options.RegisterDocumentType<StatisticsEntry>();
         options.Schema.For<StatisticsEntry>()
-            .DocumentAlias("machineservices_statistics")
+            .DocumentAlias("ms_statistics")
             .Identity(x => x.Id)
+            .Duplicate(x => x.CreatedAt) //fix for indexes not working on datetimeoffset: https://martendb.io/documents/indexing/computed-indexes.html#calculated-index
             .UniqueIndex(x => x.CreatedAt);
         return options;
     }

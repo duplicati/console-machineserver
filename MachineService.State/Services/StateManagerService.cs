@@ -359,18 +359,21 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     {
         options.RegisterDocumentType<ActiveConnection>();
         options.Schema.For<ActiveConnection>()
-            .DocumentAlias("machineservices_activeconnection")
+            .DocumentAlias("ms_activeconnection")
             .Identity(x => x.Id)
-            .UniqueIndex("machineservices_activeconnection_clientid_organizationid", x => x.ClientId, x => x.OrganizationId);
+            .Duplicate(x => x.LastUpdateOn) //fix for indexes not working on datetimeoffset: https://martendb.io/documents/indexing/computed-indexes.html#calculated-index
+            .UniqueIndex("ms_activeconnection_clientid_organizationid", x => x.ClientId, x => x.OrganizationId);
 
         options.RegisterDocumentType<ClientRegisterHistory>();
         options.Schema.For<ClientRegisterHistory>()
-            .DocumentAlias("machineservices_clientregisterhistory")
+            .DocumentAlias("ms_clientregisterhistory")
+            .Duplicate(x => x.RegisteredOn) //fix for indexes not working on datetimeoffset: https://martendb.io/documents/indexing/computed-indexes.html#calculated-index
             .Identity(x => x.RegisterId);
 
         options.RegisterDocumentType<ClientUnregisterHistory>();
         options.Schema.For<ClientUnregisterHistory>()
-            .DocumentAlias("machineservices_clientunregisterhistory")
+            .DocumentAlias("ms_clientunregisterhistory")
+            .Duplicate(x => x.UnregisterOn) //fix for indexes not working on datetimeoffset: https://martendb.io/documents/indexing/computed-indexes.html#calculated-index
             .Identity(x => x.UnregisterId);
 
         return options;
