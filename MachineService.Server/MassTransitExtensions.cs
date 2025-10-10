@@ -78,7 +78,7 @@ public static class MassTransitExtensions
                         ConnectionString = connectionString
                     }));
 
-                    configurator.ConfigureEndpoints(ctx, new KebabCaseEndpointNameFormatter(envConfig.InstanceId, false));
+                    configurator.ConfigureEndpoints(ctx);
                 });
             }
         });
