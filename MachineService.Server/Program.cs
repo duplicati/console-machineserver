@@ -34,6 +34,7 @@ using Serilog.Core;
 using Serilog.Events;
 using MachineService.GatewayClient.Services;
 using ConsoleCommon;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -335,6 +336,9 @@ builder.Host.ConfigureHostOptions(opts =>
 var app = builder.Build();
 
 app.UseCommonLogging();
+
+// Explicitly start the MassTransit bus so it is ready when we need it
+await app.Services.GetRequiredService<IBusControl>().StartAsync();
 
 // Log shutdown events
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
