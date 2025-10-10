@@ -35,7 +35,7 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     /// <summary>
     /// The time to wait for a request to complete
     /// </summary>
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>
     /// Validates an agent JWT token by sending it to the console via MassTransit request/response.
