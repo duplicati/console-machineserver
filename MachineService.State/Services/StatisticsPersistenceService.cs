@@ -37,8 +37,9 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
     /// </summary>
     /// <param name="Id">The unique ID of the entry</param>
     /// <param name="CreatedAt">When the statistics were created</param>
+    /// <param name="InstanceId">The instance ID of the machine service</param>
     /// <param name="Statistics">The statistics data</param>
-    public sealed record StatisticsEntry(string Id, DateTimeOffset CreatedAt, Dictionary<string, ulong> Statistics);
+    public sealed record StatisticsEntry(string Id, DateTimeOffset CreatedAt, string? InstanceId, Dictionary<string, ulong> Statistics);
 
     /// <inheritdoc/>
     public async Task PersistStatistics(Dictionary<string, ulong> statistics, CancellationToken cancellationToken)
@@ -46,7 +47,7 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
         if (statistics == null || statistics.Count == 0)
             return;
 
-        var entry = new StatisticsEntry(Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(), DateTimeOffset.UtcNow, statistics);
+        var entry = new StatisticsEntry(Uuid.NewDatabaseFriendly(Database.PostgreSql).ToString(), DateTimeOffset.UtcNow, config.InstanceId, statistics);
         using var session = store.LightweightSession();
         session.Insert(entry);
         try
