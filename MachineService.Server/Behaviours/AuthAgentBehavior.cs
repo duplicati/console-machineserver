@@ -56,16 +56,18 @@ public class AuthAgentBehavior(
         if (string.IsNullOrWhiteSpace(message.Payload))
             throw new PolicyViolationException(ErrorMessages.AuthMessageWithoutPayload);
 
-        // We only accept auth from clients originally identified as Portal
+        // We only accept auth from clients originally identified as Agent
         // via the route on the connection, who would be in the following states
         // The reason we allow Authenticated to call it again, is to allow and easy
         // way to keep a connection by simply authenticating again in the same socket.
-        if (!new List<ConnectionState>
-            {
-                ConnectionState.ConnectedAgentUnauthenticated,
-                ConnectionState.ConnectedAgentAuthenticated
-            }.Contains(state.ConnectionState))
-            throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForAuthentication);
+        switch (state.ConnectionState)
+        {
+            case ConnectionState.ConnectedAgentUnauthenticated:
+            case ConnectionState.ConnectedAgentAuthenticated:
+                break;
+            default:
+                throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForAuthentication);
+        }
 
         AuthMessage authRequest;
         try

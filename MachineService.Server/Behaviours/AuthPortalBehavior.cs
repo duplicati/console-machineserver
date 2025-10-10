@@ -53,12 +53,14 @@ public class AuthPortalBehavior(
         // via the route on the connection, who would be in the following states
         // The reason we allow Authenticated to call it again, is to allow an easy
         // way to keep a connection by simply authenticating again in the same socket.
-        if (!new List<ConnectionState>
-            {
-                ConnectionState.ConnectedPortalUnauthenticated,
-                ConnectionState.ConnectedPortalAuthenticated
-            }.Contains(state.ConnectionState))
-            throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForAuthentication);
+        switch (state.ConnectionState)
+        {
+            case ConnectionState.ConnectedPortalUnauthenticated:
+            case ConnectionState.ConnectedPortalAuthenticated:
+                break;
+            default:
+                throw new PolicyViolationException(ErrorMessages.InvalidConnectionStateForAuthentication);
+        }
 
         AuthMessage authRequest;
         try
