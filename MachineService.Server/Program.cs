@@ -178,7 +178,7 @@ else
     else
         builder.Services.AddTransient<IStateManagerService, StateManagerService>();
 
-    builder.Services.RegisterMartenDB(connectionString, envConfig.VerifySchema ?? true, envConfig.PreCompiledDbClasses ?? false);
+    builder.Services.RegisterMartenDB(connectionString, builder.Environment.IsDevelopment(), envConfig.VerifySchema ?? true, envConfig.PreCompiledDbClasses ?? false);
 }
 
 builder.Services.AddHostedService<GatherStatisticsPersistence>();

@@ -88,12 +88,13 @@ public static class MartenExtensions
     /// </summary>
     /// <param name="services">The service collection to add MartenDB to</param>
     /// <param name="connectionString">The connection string for the MartenDB database</param>
+    /// <param name="isDevMode">Whether the application is running in development mode</param>
     /// <param name="verifySchema">Whether to verify the database schema on startup</param>
     /// <param name="preCompiledDbClasses">Whether the database classes are pre-compiled</param>
     /// <returns>The updated service collection</returns>
-    public static IServiceCollection RegisterMartenDB(this IServiceCollection services, string connectionString, bool verifySchema, bool preCompiledDbClasses)
+    public static IServiceCollection RegisterMartenDB(this IServiceCollection services, string connectionString, bool isDevMode, bool verifySchema, bool preCompiledDbClasses)
     {
-        var res = services.AddMarten(Configure(connectionString, AutoCreate.None, preCompiledDbClasses ? TypeLoadMode.Static : TypeLoadMode.Auto))
+        var res = services.AddMarten(Configure(connectionString, isDevMode ? AutoCreate.CreateOrUpdate : AutoCreate.None, preCompiledDbClasses ? TypeLoadMode.Static : TypeLoadMode.Auto))
             .UseLightweightSessions();
         // Ideally, we should *always* verify the schema, but the reduced permissions in some environments
         // prevent the schema from being verified.
