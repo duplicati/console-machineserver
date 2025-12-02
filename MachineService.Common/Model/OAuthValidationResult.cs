@@ -26,20 +26,23 @@ namespace MachineService.Common.Model;
 /// <param name="Exception">The exception if not successful</param>
 /// <param name="OrganizationId">The organization ID if successful</param>
 /// <param name="TokenExpiration">The token expiration if successful</param>
+/// <param name="Impersonated">Whether the token is an impersonation token</param>
 public record OAuthValidationResult(
     bool Success,
     Exception? Exception,
     string? OrganizationId,
-    DateTimeOffset? TokenExpiration)
+    DateTimeOffset? TokenExpiration,
+    bool Impersonated)
 {
     /// <summary>
     /// Creates a successful validation result.
     /// </summary>
     /// <param name="organizationId">The organization ID</param>
     /// <param name="tokenExpiration">The token expiration date</param>
+    /// <param name="impersonated">Whether the token is an impersonation token</param>
     /// <returns>The success result</returns>
-    public static OAuthValidationResult SuccessResult(string organizationId, DateTimeOffset tokenExpiration) =>
-        new OAuthValidationResult(true, null, organizationId, tokenExpiration);
+    public static OAuthValidationResult SuccessResult(string organizationId, DateTimeOffset tokenExpiration, bool impersonated) =>
+        new OAuthValidationResult(true, null, organizationId, tokenExpiration, impersonated);
 
     /// <summary>
     /// Creates a failure validation result.
@@ -47,5 +50,5 @@ public record OAuthValidationResult(
     /// <param name="exception">The exception that caused the failure</param>
     /// <returns>The failure result</returns>
     public static OAuthValidationResult FailureResult(Exception exception) =>
-        new OAuthValidationResult(false, exception, null, null);
+        new OAuthValidationResult(false, exception, null, null, false);
 }

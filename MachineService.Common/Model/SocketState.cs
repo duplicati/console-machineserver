@@ -163,6 +163,11 @@ public record SocketState : IDisposable
     public ConnectionState ConnectionState { get; set; } = ConnectionState.ConnectedUnknown;
 
     /// <summary>
+    /// Whether the connection is impersonated
+    /// </summary>
+    public bool Impersonated { get; set; }
+
+    /// <summary>
     /// Increment the bytes received statistics. If the counter is at the maximum value, it will reset to 0 to avoid overflow.
     /// </summary>
     /// <param name="bytesReceived">Bytes to increment the counter by</param>

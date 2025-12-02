@@ -56,6 +56,17 @@ public class CommandBehavior(EnvironmentConfig envConfig, DerivedConfig derivedC
                 SocketState? destination = null;
                 destination = connectionList.FirstOrDefault(x => x.ClientId == message.To);
 
+                if (state.Impersonated)
+                {
+                    Log.Error("Cross organization message relay attempt {From}@{OrganizationId} to {To}", message.From, state.OrganizationId, message.To);
+
+                    // Break the connection with the requester
+                    await state.WebSocket.TerminateWithPolicyViolation("Access denied");
+                    // Just in case, reset destination connection as well and let it re-connect and authenticate
+                    if (destination is not null)
+                        await destination.WebSocket.TerminateGracefully();
+                }
+
                 // Forward to relevant gateways
                 var any = await gatewayConnectionList.ForwardToRelevantGateways(envConfig.InstanceId!, message, state.OrganizationId, state.ClientId);
 

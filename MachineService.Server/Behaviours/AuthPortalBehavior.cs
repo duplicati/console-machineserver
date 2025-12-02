@@ -84,6 +84,7 @@ public class AuthPortalBehavior(
             state.ClientId = message.From!;
             state.ClientVersion = authRequest.ClientVersion;
             state.ConnectionState = ConnectionState.ConnectedPortalAuthenticated;
+            state.Impersonated = authResult.Impersonated;
             await stateManagerService.RegisterClient(state.Type, state.ConnectionId, state.ClientId, state.OrganizationId!,
                 state.RegisteredAgentId, state.ClientVersion, envConfig.InstanceId, state.RemoteIpAddress, CancellationToken.None);
         }

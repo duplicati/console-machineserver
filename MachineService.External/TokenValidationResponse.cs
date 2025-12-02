@@ -31,5 +31,6 @@ namespace MachineService.External;
 /// <param name="Expires">When the token expires</param>
 /// <param name="NewToken">New token if current token is expiring soon</param>
 /// <param name="Message">A message about the validation, if failed</param>
-public sealed record TokenValidationResponse(bool Success, string? OrganizationId, string? RegisteredAgentId, DateTimeOffset? Expires, string? NewToken, string? Message = null);
+/// <param name="IsImpersonated">Whether the token is an impersonation token</param>
+public sealed record TokenValidationResponse(bool Success, string? OrganizationId, string? RegisteredAgentId, DateTimeOffset? Expires, string? NewToken, string? Message = null, bool? IsImpersonated = null);
 
