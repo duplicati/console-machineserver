@@ -39,7 +39,11 @@ public class StatisticsPersistenceService(EnvironmentConfig config, IDocumentSto
     /// <param name="CreatedAt">When the statistics were created</param>
     /// <param name="InstanceId">The instance ID of the machine service</param>
     /// <param name="Statistics">The statistics data</param>
-    public sealed record StatisticsEntry(string Id, DateTimeOffset CreatedAt, string? InstanceId, Dictionary<string, ulong> Statistics);
+    public sealed record StatisticsEntry(
+        string Id,
+        DateTimeOffset CreatedAt,
+        string? InstanceId,
+        Dictionary<string, ulong> Statistics);
 
     /// <inheritdoc/>
     public async Task PersistStatistics(Dictionary<string, ulong> statistics, CancellationToken cancellationToken)

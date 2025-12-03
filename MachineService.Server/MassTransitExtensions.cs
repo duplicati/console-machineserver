@@ -59,6 +59,7 @@ public static class MassTransitExtensions
                 if (string.IsNullOrWhiteSpace(envConfig.GatewayServers))
                     x.AddConsumer<BackendControlMessageHandler>();
             }
+
             if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(connectionString))
             {
                 x.UsingInMemory((context, cfg) =>
@@ -78,7 +79,18 @@ public static class MassTransitExtensions
                         ConnectionString = connectionString
                     }));
 
-                    configurator.ConfigureEndpoints(ctx);
+                    if (envConfig.GatewayMode)
+                    {
+                        configurator.ReceiveEndpoint("agent-control-command-request", e =>
+                        {
+                            e.ConfigureConsumer<AgentControlCommandRequestHandler>(ctx);
+                        });
+                    }
+                    else
+                    {
+                        // Non-gateway mode can stay convention-based:
+                        configurator.ConfigureEndpoints(ctx);
+                    }
                 });
             }
         });
