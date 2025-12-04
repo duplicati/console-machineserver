@@ -50,19 +50,18 @@ public static class MassTransitExtensions
             {
                 // In gateway mode, the gateway handles agent control commands
                 x.AddConsumer<AgentControlCommandRequestHandler>();
-                x.AddRequestClient<ValidateConnectRequestToken>();
+                x.AddRequestClient<ValidateConnectRequestToken>(new Uri("queue:validate-request-token"));
                 x.AddConsumer<CleanupMessageHandler>();
             }
             else if (connectorNode)
             {
-                x.AddRequestClient<ValidateAgentRequestToken>();
-                x.AddRequestClient<ValidateConnectRequestToken>();
+                x.AddRequestClient<ValidateAgentRequestToken>(new Uri("queue:validate-request-token"));
             }
             else
             {
-                x.AddRequestClient<ValidateAgentRequestToken>();
+                x.AddRequestClient<ValidateAgentRequestToken>(new Uri("queue:validate-request-token"));
+                x.AddRequestClient<ValidateConnectRequestToken>(new Uri("queue:validate-request-token"));
                 x.AddConsumer<CleanupMessageHandler>();
-                x.AddRequestClient<ValidateConnectRequestToken>();
                 // In stand-alone, we also handle backend control messages directly
                 x.AddConsumer<BackendControlMessageHandler>();
             }
