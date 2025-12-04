@@ -48,16 +48,34 @@ public class PendingAgentControlService : IPendingAgentControlService
     public Task<ControlResponseMessage> PrepareForControlResponse(string organizationId, string clientId, string messageId, CancellationToken ct)
     {
         var key = GetKey(organizationId, clientId, messageId);
-        var tcs = new TaskCompletionSource<ControlResponseMessage>();
-        ct.Register(() =>
-        {
-            tcs.TrySetCanceled();
-            lock (_lock)
-                _pendingResponses.Remove(key);
-        });
+        var tcs = new TaskCompletionSource<ControlResponseMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
 
         lock (_lock)
+        {
+            if (ct.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled(ct);
+                return tcs.Task;
+            }
+
             _pendingResponses[key] = tcs;
+        }
+
+        var registration = ct.Register(() =>
+        {
+            tcs.TrySetCanceled(ct);
+            lock (_lock)
+                if (_pendingResponses.TryGetValue(key, out var existing) && ReferenceEquals(existing, tcs))
+                    _pendingResponses.Remove(key);
+        });
+
+        tcs.Task.ContinueWith(_ => registration.Dispose(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
         return tcs.Task;
     }
 

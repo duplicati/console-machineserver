@@ -35,27 +35,28 @@ public class AgentControlCommandRequestHandler(
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<AgentControlCommandRequest> context)
     {
-        var targetClient = (await stateManagerService.GetAgents(context.Message.OrganizationId, CancellationToken.None))
-            .FirstOrDefault(x => x.Type == ConnectionType.Agent && x.MachineRegistrationId == context.Message.AgentId);
-
-        var destination = connectionList.FirstOrDefault(x => x.ClientId == targetClient?.GatewayId && x.Type == ConnectionType.Gateway);
-        if (destination is null || targetClient is null || targetClient.OrganizationId != context.Message.OrganizationId)
-        {
-            statisticsGatherer.Increment(StatisticsType.ControlRelayDestinationNotAvailable);
-            await context.RespondAsync(new AgentControlCommandResponse(
-                AgentId: context.Message.AgentId,
-                OrganizationId: context.Message.OrganizationId,
-                Settings: null,
-                Success: false,
-                Message: "Client was not connected"
-            ));
-
-            return;
-        }
-
-        statisticsGatherer.Increment(StatisticsType.ControlRelayInitiated);
+        using var ct = new CancellationTokenSource(ControlResponseTimeout);
         try
         {
+            var targetClient = (await stateManagerService.GetAgents(context.Message.OrganizationId, ct.Token))
+                .FirstOrDefault(x => x.Type == ConnectionType.Agent && x.MachineRegistrationId == context.Message.AgentId);
+
+            var destination = connectionList.FirstOrDefault(x => x.ClientId == targetClient?.GatewayId && x.Type == ConnectionType.Gateway);
+            if (destination is null || targetClient is null || targetClient.OrganizationId != context.Message.OrganizationId)
+            {
+                statisticsGatherer.Increment(StatisticsType.ControlRelayDestinationNotAvailable);
+                await context.RespondAsync(new AgentControlCommandResponse(
+                    AgentId: context.Message.AgentId,
+                    OrganizationId: context.Message.OrganizationId,
+                    Settings: null,
+                    Success: false,
+                    Message: "Client was not connected"
+                ));
+
+                return;
+            }
+
+            statisticsGatherer.Increment(StatisticsType.ControlRelayInitiated);
             // Prepare the message
             var message = new EnvelopedMessage()
             {
@@ -77,14 +78,15 @@ public class AgentControlCommandRequestHandler(
             };
 
             // Prepare to wait for a response
-            using var ct = new CancellationTokenSource(ControlResponseTimeout);
             var responseTask = pendingAgentControlService.PrepareForControlResponse(targetClient.OrganizationId, targetClient.ClientId, message.MessageId, ct.Token);
 
             // Send the message
-            await destination.WriteMessage(message, WrappingType.PlainText, destination.ClientPublicKey);
+            await destination.WriteMessage(message, WrappingType.PlainText, destination.ClientPublicKey)
+                .WaitAsync(ct.Token);
 
             // Wait for the response
-            var response = await responseTask;
+            var response = await responseTask
+                .WaitAsync(ct.Token);
 
             statisticsGatherer.Increment(StatisticsType.ControlRelaySuccess);
 
