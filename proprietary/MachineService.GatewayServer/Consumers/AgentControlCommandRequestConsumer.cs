@@ -51,7 +51,7 @@ public class AgentControlCommandRequestHandler(
                     Settings: null,
                     Success: false,
                     Message: "Client was not connected"
-                ));
+                ), ctx => { ctx.TimeToLive = TimeSpan.FromMinutes(1); });
 
                 return;
             }
@@ -97,7 +97,7 @@ public class AgentControlCommandRequestHandler(
                 Settings: response.Output,
                 Success: response.Success,
                 Message: response.ErrorMessage
-            ));
+            ), ctx => { ctx.TimeToLive = TimeSpan.FromMinutes(1); });
         }
         catch (Exception ex)
         {
@@ -108,7 +108,7 @@ public class AgentControlCommandRequestHandler(
                 Settings: null,
                 Success: false,
                 Message: $"Failed to send message to client: {ex.Message}"
-            ));
+            ), ctx => { ctx.TimeToLive = TimeSpan.FromMinutes(1); });
         }
     }
 }
