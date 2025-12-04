@@ -43,21 +43,28 @@ public static class MassTransitExtensions
         var connectionString = builder.Configuration.GetValue<string>("Messaging:ConnectionString");
         return services.AddMassTransit(x =>
         {
-            x.AddRequestClient<ValidateConnectRequestToken>();
-            if (envConfig.GatewayMode)
+            var gatewayNode = envConfig.GatewayMode;
+            var connectorNode = !envConfig.GatewayMode && !string.IsNullOrWhiteSpace(envConfig.GatewayServers);
+
+            if (gatewayNode)
             {
                 // In gateway mode, the gateway handles agent control commands
                 x.AddConsumer<AgentControlCommandRequestHandler>();
+                x.AddRequestClient<ValidateConnectRequestToken>();
+                x.AddConsumer<CleanupMessageHandler>();
+            }
+            else if (connectorNode)
+            {
+                x.AddRequestClient<ValidateAgentRequestToken>();
+                x.AddRequestClient<ValidateConnectRequestToken>();
             }
             else
             {
                 x.AddRequestClient<ValidateAgentRequestToken>();
                 x.AddConsumer<CleanupMessageHandler>();
-
-                // If the server is not in gateway mode and no gateway servers are configured,
-                // it should handle backend relay messages directly
-                if (string.IsNullOrWhiteSpace(envConfig.GatewayServers))
-                    x.AddConsumer<BackendControlMessageHandler>();
+                x.AddRequestClient<ValidateConnectRequestToken>();
+                // In stand-alone, we also handle backend control messages directly
+                x.AddConsumer<BackendControlMessageHandler>();
             }
 
             if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(connectionString))
@@ -79,18 +86,25 @@ public static class MassTransitExtensions
                         ConnectionString = connectionString
                     }));
 
-                    if (envConfig.GatewayMode)
+                    if (gatewayNode)
                     {
                         configurator.ReceiveEndpoint("agent-control-command-request", e =>
                         {
                             e.ConfigureConsumer<AgentControlCommandRequestHandler>(ctx);
                         });
+
                     }
-                    else
+                    else if (!connectorNode)
                     {
-                        // Non-gateway mode can stay convention-based:
-                        configurator.ConfigureEndpoints(ctx);
+                        configurator.ReceiveEndpoint("agent-control-command-request", e =>
+                        {
+                            e.ConfigureConsumer<BackendControlMessageHandler>(ctx);
+                        });
                     }
+
+                    // Configure remaining consumers (such as CleanupMessageHandler) using default endpoint conventions
+                    configurator.ConfigureEndpoints(ctx);
+
                 });
             }
         });
