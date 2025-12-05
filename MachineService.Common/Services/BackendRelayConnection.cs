@@ -74,18 +74,22 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     /// <returns>The validation result</returns>
     public async Task<OAuthValidationResult> ValidateOAuthToken(string token)
     {
-        var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token), CancellationToken.None, RequestTimeout)
-            .WaitAsync(RequestTimeout.Add(TimeSpan.FromSeconds(5)));
+        try
+        {
+            var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token), CancellationToken.None, RequestTimeout)
+                .WaitAsync(RequestTimeout.Add(TimeSpan.FromSeconds(5)));
 
-        if (resp == null)
-            return OAuthValidationResult.FailureResult(new TimeoutException("Request timed out"));
+            if (resp.Message.Success)
+                return OAuthValidationResult.SuccessResult(
+                    organizationId: resp.Message.OrganizationId!,
+                    tokenExpiration: resp.Message.Expires!.Value,
+                    impersonated: resp.Message.IsImpersonated ?? false);
 
-        if (resp.Message.Success)
-            return OAuthValidationResult.SuccessResult(
-                organizationId: resp.Message.OrganizationId!,
-                tokenExpiration: resp.Message.Expires!.Value,
-                impersonated: resp.Message.IsImpersonated ?? false);
-
-        return OAuthValidationResult.FailureResult(new Exception(resp.Message.Message));
+            return OAuthValidationResult.FailureResult(new Exception(resp.Message.Message));
+        }
+        catch (Exception ex)
+        {
+            return OAuthValidationResult.FailureResult(ex);
+        }
     }
 }
