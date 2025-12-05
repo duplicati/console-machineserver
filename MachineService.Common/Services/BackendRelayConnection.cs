@@ -20,6 +20,7 @@
 using MachineService.Common.Interfaces;
 using MachineService.External;
 using MassTransit;
+using Serilog;
 
 namespace MachineService.Common.Services;
 
@@ -63,6 +64,7 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
         }
         catch (Exception ex)
         {
+            Log.Warning("Exception while validating agent token: {ExceptionMessage}", ex.Message);
             return AgentClientValidationResult.FailureResult(ex);
         }
     }
@@ -89,6 +91,7 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
         }
         catch (Exception ex)
         {
+            Log.Warning("Exception while validating agent token: {ExceptionMessage}", ex.Message);
             return OAuthValidationResult.FailureResult(ex);
         }
     }
