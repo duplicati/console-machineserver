@@ -35,7 +35,7 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     /// <summary>
     /// The time to wait for a request to complete
     /// </summary>
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Validates an agent JWT token by sending it to the console via MassTransit request/response.
@@ -46,7 +46,8 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     {
         try
         {
-            var resp = await requestAgentClient.GetResponse<TokenValidationResponse>(new ValidateAgentRequestToken(token), CancellationToken.None, RequestTimeout);
+            var resp = await requestAgentClient.GetResponse<TokenValidationResponse>(new ValidateAgentRequestToken(token), CancellationToken.None, RequestTimeout)
+                .WaitAsync(RequestTimeout.Add(TimeSpan.FromSeconds(5)));
             if (resp == null)
                 return AgentClientValidationResult.FailureResult(new TimeoutException("Request timed out"));
 
@@ -73,7 +74,9 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     /// <returns>The validation result</returns>
     public async Task<OAuthValidationResult> ValidateOAuthToken(string token)
     {
-        var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token), CancellationToken.None, RequestTimeout);
+        var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token), CancellationToken.None, RequestTimeout)
+            .WaitAsync(RequestTimeout.Add(TimeSpan.FromSeconds(5)));
+
         if (resp == null)
             return OAuthValidationResult.FailureResult(new TimeoutException("Request timed out"));
 
