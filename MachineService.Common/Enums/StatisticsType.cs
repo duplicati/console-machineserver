@@ -105,4 +105,8 @@ public enum StatisticsType
     /// Invalid proxy command
     /// </summary>
     InvalidProxyCommand = 119,
+    /// <summary>
+    /// Control relay stale message received (message received after control relay timeout)
+    /// </summary>
+    ControlRelayStaleMessage = 120,
 }

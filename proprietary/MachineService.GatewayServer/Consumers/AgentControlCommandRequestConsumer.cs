@@ -40,6 +40,7 @@ public class AgentControlCommandRequestHandler(
             // If the message is older than 5 minutes, ignore it. Current timeout
             // from the backend is 35 seconds, so this is a very generous
             // threshold to account for any potential delays in message processing.
+            statisticsGatherer.Increment(StatisticsType.ControlRelayStaleMessage);
 
             return;
         }
