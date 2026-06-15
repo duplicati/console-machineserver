@@ -48,7 +48,7 @@ public class AgentControlCommandRequestHandler(
         using var ct = new CancellationTokenSource(ControlResponseTimeout);
         try
         {
-            var targetClient = (await stateManagerService.GetAgents(context.Message.OrganizationId, ct.Token))
+            var targetClient = (await stateManagerService.GetAgents([context.Message.OrganizationId], ct.Token))
                 .FirstOrDefault(x => x.Type == ConnectionType.Agent && x.MachineRegistrationId == context.Message.AgentId);
 
             var destination = connectionList.FirstOrDefault(x => x.ClientId == targetClient?.GatewayId && x.Type == ConnectionType.Gateway);

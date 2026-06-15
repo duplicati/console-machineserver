@@ -95,26 +95,32 @@ public class InMemoryStateManagerService : IStateManagerService
     /// <summary>
     /// Gets the list of active connections for the specified organization and client type.
     /// </summary>
-    /// <param name="organizationId">The organization ID</param>
+    /// <param name="organizationIds">The organization IDs</param>
     /// <param name="clientType">The client type</param>
     /// <returns>A list of active connections</returns>
-    public Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType, CancellationToken cancellationToken)
+    public Task<List<ClientRegistration>> GetConnections(string[] organizationIds, ConnectionType clientType, CancellationToken cancellationToken)
     {
-        var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
-        var registrations = orgDict.Values
-            .Where(x => x.Type == clientType)
-            .Where(x => x.LastUpdatedOn >= DateTimeOffset.UtcNow - ClientTimeout)
-            .ToList();
-        return Task.FromResult(registrations);
+        var result = new List<ClientRegistration>();
+        foreach (var organizationId in organizationIds)
+        {
+            var orgDict = _registrations.GetOrAdd(organizationId, _ => new ConcurrentDictionary<string, ClientRegistration>());
+            var registrations = orgDict.Values
+                .Where(x => x.Type == clientType)
+                .Where(x => x.LastUpdatedOn >= DateTimeOffset.UtcNow - ClientTimeout)
+                .ToList();
+            result.AddRange(registrations);
+        }
+
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken)
-        => await GetConnections(organizationId, ConnectionType.Agent, cancellationToken);
+    public async Task<List<ClientRegistration>> GetAgents(string[] organizationIds, CancellationToken cancellationToken)
+        => await GetConnections(organizationIds, ConnectionType.Agent, cancellationToken);
 
     /// <inheritdoc />
     public async Task<List<ClientRegistration>> GetPortals(string organizationId, CancellationToken cancellationToken)
-        => await GetConnections(organizationId, ConnectionType.Portal, cancellationToken);
+        => await GetConnections([organizationId], ConnectionType.Portal, cancellationToken);
 
     /// <inheritdoc />
     public Task PurgeStaleData(CancellationToken cancellationToken)

@@ -67,10 +67,10 @@ public interface IStateManagerService
     /// <summary>
     /// Gets the list of active agents for the specified organization
     /// </summary>
-    /// <param name="organizationId">The organization ID</param>
+    /// <param name="organizationIds">The organization IDs</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A list of active agents</returns>
-    public Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken);
+    public Task<List<ClientRegistration>> GetAgents(string[] organizationIds, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the list of active portals for the specified organization

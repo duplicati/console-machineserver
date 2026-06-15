@@ -67,11 +67,12 @@ public class AuthPortalBehavior(
         if (string.IsNullOrWhiteSpace(authRequest?.Token))
             throw new PolicyViolationException(ErrorMessages.AuthMessageWithoutToken);
 
-        var authResult = await backendRelayConnection.ValidateOAuthToken(authRequest.Token);
+        var authResult = await backendRelayConnection.ValidateOAuthToken(authRequest.Token, authRequest.IncludeSubOrgs ?? false);
         if (authResult.Success)
         {
             state.OrganizationId = authResult.OrganizationId;
             state.TokenExpiration = authResult.TokenExpiration;
+            state.SubOrganizationIds = authRequest.IncludeSubOrgs == true ? authResult.SubOrganizations : null;
             state.ClientId = message.From!;
             state.ClientVersion = authRequest.ClientVersion;
             state.ConnectionState = ConnectionState.ConnectedPortalAuthenticated;

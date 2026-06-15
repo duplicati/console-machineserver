@@ -95,6 +95,16 @@ public record SocketState : IDisposable
     public string? OrganizationId { get; set; }
 
     /// <summary>
+    /// List of sub-organization IDs associated with this client, if any.
+    /// </summary>
+    public string[]? SubOrganizationIds { get; set; }
+
+    /// <summary>
+    /// Gets all organization IDs associated with this socket, including the main organization and any sub-organizations.
+    /// </summary>
+    public string[] AllOrganizationIds => string.IsNullOrWhiteSpace(OrganizationId) ? [] : [OrganizationId, .. SubOrganizationIds ?? []];
+
+    /// <summary>
     /// Expiration time of the client's authentication token.
     /// </summary>
     public DateTimeOffset? TokenExpiration { get; set; }

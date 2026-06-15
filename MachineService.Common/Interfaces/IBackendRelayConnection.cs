@@ -36,6 +36,7 @@ public interface IBackendRelayConnection
     /// Validates an Portal OAuth token
     /// </summary>
     /// <param name="token">The token</param>
+    /// <param name="includeSubOrgs">Whether to include sub-organization IDs in the response</param>
     /// <returns>Backend validatedOAuthValidationResult </returns>
-    Task<OAuthValidationResult> ValidateOAuthToken(string token);
+    Task<OAuthValidationResult> ValidateOAuthToken(string token, bool includeSubOrgs);
 }

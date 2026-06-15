@@ -303,12 +303,12 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     /// <param name="clientType">The client type</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A list of active connections</returns>
-    private async Task<List<ClientRegistration>> GetConnections(string organizationId, ConnectionType clientType, CancellationToken cancellationToken)
+    private async Task<List<ClientRegistration>> GetConnections(string[] organizationIds, ConnectionType clientType, CancellationToken cancellationToken)
     {
         var expirationTime = DateTimeOffset.UtcNow - ClientTimeout;
         using var session = store.LightweightSession();
         var registrations = await session.Query<ActiveConnection>()
-            .Where(x => x.OrganizationId == organizationId)
+            .Where(x => organizationIds.Contains(x.OrganizationId))
             .Where(x => x.LastUpdateOn >= expirationTime)
             .Where(x => x.ClientType == clientType)
             .ToListAsync(cancellationToken);
@@ -326,12 +326,12 @@ public class StateManagerService(IDocumentStore store, EnvironmentConfig environ
     }
 
     /// <inheritdoc />
-    public async Task<List<ClientRegistration>> GetAgents(string organizationId, CancellationToken cancellationToken)
-        => await GetConnections(organizationId, ConnectionType.Agent, cancellationToken);
+    public async Task<List<ClientRegistration>> GetAgents(string[] organizationIds, CancellationToken cancellationToken)
+        => await GetConnections(organizationIds, ConnectionType.Agent, cancellationToken);
 
     /// <inheritdoc />
     public async Task<List<ClientRegistration>> GetPortals(string organizationId, CancellationToken cancellationToken)
-        => await GetConnections(organizationId, ConnectionType.Portal, cancellationToken);
+        => await GetConnections([organizationId], ConnectionType.Portal, cancellationToken);
 
     /// <inheritdoc />
     public async Task PurgeStaleData(CancellationToken cancellationToken)

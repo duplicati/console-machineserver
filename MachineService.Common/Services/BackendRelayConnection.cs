@@ -73,19 +73,21 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
     /// Validates an OAuth token by sending it to the console via MassTransit request/response.
     /// </summary>
     /// <param name="token">The token to validate</param>
+    /// <param name="includeSubOrgs">Whether to include sub-organization IDs in the response</param>
     /// <returns>The validation result</returns>
-    public async Task<OAuthValidationResult> ValidateOAuthToken(string token)
+    public async Task<OAuthValidationResult> ValidateOAuthToken(string token, bool includeSubOrgs)
     {
         try
         {
-            var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token), CancellationToken.None, RequestTimeout)
+            var resp = await requestConnectClient.GetResponse<TokenValidationResponse>(new ValidateConnectRequestToken(token, includeSubOrgs), CancellationToken.None, RequestTimeout)
                 .WaitAsync(RequestTimeout.Add(TimeSpan.FromSeconds(5)));
 
             if (resp.Message.Success)
                 return OAuthValidationResult.SuccessResult(
                     organizationId: resp.Message.OrganizationId!,
                     tokenExpiration: resp.Message.Expires!.Value,
-                    impersonated: resp.Message.IsImpersonated ?? false);
+                    impersonated: resp.Message.IsImpersonated ?? false,
+                    subOrganizations: resp.Message.Suborganizations);
 
             return OAuthValidationResult.FailureResult(new Exception(resp.Message.Message));
         }

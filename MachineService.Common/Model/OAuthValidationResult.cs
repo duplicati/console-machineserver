@@ -27,12 +27,14 @@ namespace MachineService.Common.Model;
 /// <param name="OrganizationId">The organization ID if successful</param>
 /// <param name="TokenExpiration">The token expiration if successful</param>
 /// <param name="Impersonated">Whether the token is an impersonation token</param>
+/// <param name="SubOrganizations">The sub-organizations if any</param>
 public record OAuthValidationResult(
     bool Success,
     Exception? Exception,
     string? OrganizationId,
     DateTimeOffset? TokenExpiration,
-    bool Impersonated)
+    bool Impersonated,
+    string[]? SubOrganizations)
 {
     /// <summary>
     /// Creates a successful validation result.
@@ -40,9 +42,10 @@ public record OAuthValidationResult(
     /// <param name="organizationId">The organization ID</param>
     /// <param name="tokenExpiration">The token expiration date</param>
     /// <param name="impersonated">Whether the token is an impersonation token</param>
+    /// <param name="subOrganizations">The sub-organizations if any</param>
     /// <returns>The success result</returns>
-    public static OAuthValidationResult SuccessResult(string organizationId, DateTimeOffset tokenExpiration, bool impersonated) =>
-        new OAuthValidationResult(true, null, organizationId, tokenExpiration, impersonated);
+    public static OAuthValidationResult SuccessResult(string organizationId, DateTimeOffset tokenExpiration, bool impersonated, string[]? subOrganizations) =>
+        new OAuthValidationResult(true, null, organizationId, tokenExpiration, impersonated, subOrganizations);
 
     /// <summary>
     /// Creates a failure validation result.
@@ -50,5 +53,5 @@ public record OAuthValidationResult(
     /// <param name="exception">The exception that caused the failure</param>
     /// <returns>The failure result</returns>
     public static OAuthValidationResult FailureResult(Exception exception) =>
-        new OAuthValidationResult(false, exception, null, null, false);
+        new OAuthValidationResult(false, exception, null, null, false, null);
 }

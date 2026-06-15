@@ -98,6 +98,7 @@ public class AuthAgentBehavior(
             state.ClientPublicKey = clientKey;
             state.ClientVersion = authRequest.ClientVersion;
             state.OrganizationId = authResult.OrganizationId;
+            state.SubOrganizationIds = null;
             state.TokenExpiration = authResult.TokenExpiration;
             state.RegisteredAgentId = authResult.RegisteredAgentId;
             state.ClientId = message.From!;

@@ -26,4 +26,5 @@ namespace MachineService.External;
 /// This message is sent via MassTransit, so be careful when changing it.
 /// </remarks>
 /// <param name="Token">JWT to validate</param>
-public sealed record ValidateConnectRequestToken(string Token);
+/// <param name="IncludeSubOrgs">Whether to include sub-organization IDs in the response</param>
+public sealed record ValidateConnectRequestToken(string Token, bool? IncludeSubOrgs);

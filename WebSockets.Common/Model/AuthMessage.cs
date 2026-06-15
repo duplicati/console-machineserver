@@ -26,10 +26,12 @@ namespace WebSockets.Common.Model;
 /// <param name="PublicKey">The public key of the client</param>
 /// <param name="ClientVersion">The version of the client</param>
 /// <param name="ProtocolVersion">The version of the protocol</param>
+/// <param name="IncludeSubOrgs">Whether to include sub-organizations</param>
 /// <param name="Metadata">Additional metadata</param>
 public sealed record AuthMessage(
     string? Token,
     string? PublicKey,
     string ClientVersion,
     int ProtocolVersion,
+    bool? IncludeSubOrgs,
     Dictionary<string, string?>? Metadata);
