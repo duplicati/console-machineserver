@@ -32,7 +32,7 @@ namespace MachineService.External;
 /// <param name="NewToken">New token if current token is expiring soon</param>
 /// <param name="Message">A message about the validation, if failed</param>
 /// <param name="IsImpersonated">Whether the token is an impersonation token</param>
-/// <param name="Suborganizations">The sub-organizations if any</param>
+/// <param name="SubOrganizations">The sub-organizations if any</param>
 public sealed record TokenValidationResponse(
     bool Success,
     string? OrganizationId,
@@ -41,5 +41,5 @@ public sealed record TokenValidationResponse(
     string? NewToken,
     string? Message = null,
     bool? IsImpersonated = null,
-    string[]? Suborganizations = null);
+    string[]? SubOrganizations = null);
 

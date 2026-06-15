@@ -87,7 +87,7 @@ public class BackendRelayConnection(IRequestClient<ValidateAgentRequestToken> re
                     organizationId: resp.Message.OrganizationId!,
                     tokenExpiration: resp.Message.Expires!.Value,
                     impersonated: resp.Message.IsImpersonated ?? false,
-                    subOrganizations: resp.Message.Suborganizations);
+                    subOrganizations: resp.Message.SubOrganizations);
 
             return OAuthValidationResult.FailureResult(new Exception(resp.Message.Message));
         }
